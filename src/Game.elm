@@ -56,8 +56,8 @@ init settings =
     let
         initialGame =
             { settings = settings
-            , count = settings.initialCount
-            , totalMoves = settings.initialCount
+            , count = settings.gridSize
+            , totalMoves = settings.gridSize
             }
     in
     ( initialGame, Cmd.none )

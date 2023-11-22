@@ -43,7 +43,8 @@ in your Game when the user clicks StartGame.
 
 -}
 type alias Settings =
-    { initialCount : Int
+    { gridSize : Int
+    , magnetism : Int
     }
 
 
@@ -54,7 +55,8 @@ For simplicity's sake, every setting MUST have a default value.
 -}
 default : Settings
 default =
-    { initialCount = 0
+    { gridSize = 10
+    , magnetism = 3
     }
 
 
@@ -65,7 +67,8 @@ setting). This is typically the same type as your setting.
 
 -}
 type Msg
-    = SetInitialCount Int
+    = SetGridSize Int
+    | SetMagnetism Int
 
 
 {-| STEP 4: Define explicitly what happens to your settings when a message is received.
@@ -77,8 +80,11 @@ with the new payload. You can see the implementations below for this.
 update : Msg -> Settings -> Settings
 update msg settings =
     case msg of
-        SetInitialCount count ->
-            { settings | initialCount = count }
+        SetGridSize size ->
+            { settings | gridSize = size }
+
+        SetMagnetism magnetism ->
+            { settings | magnetism = magnetism }
 
 
 {-| STEP 5: Define a list of pickers for each setting you want to be able to change.
@@ -104,11 +110,18 @@ You can customise this further if you so wish (see the HELPER FUNCTIONS section 
 pickers : Settings -> List SettingPickerItem
 pickers settings =
     [ inputIntRange
-        { label = "Initial Count"
-        , value = settings.initialCount
-        , min = 0
+        { label = "GridSize"
+        , value = settings.gridSize
+        , min = 3
         , max = 100
-        , onChange = SetInitialCount
+        , onChange = SetGridSize
+        }
+    , inputIntRange
+        { label = "Magnetism"
+        , value = settings.magnetism
+        , min = 0
+        , max = 50
+        , onChange = SetMagnetism
         }
     ]
 
