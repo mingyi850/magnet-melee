@@ -45,6 +45,8 @@ in your Game when the user clicks StartGame.
 type alias Settings =
     { gridSize : Int
     , magnetism : Int
+    , maxMoves : Int
+    , players : Int
     }
 
 
@@ -57,6 +59,8 @@ default : Settings
 default =
     { gridSize = 10
     , magnetism = 3
+    , maxMoves = 10
+    , players = 2
     }
 
 

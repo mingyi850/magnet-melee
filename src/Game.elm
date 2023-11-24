@@ -14,11 +14,14 @@ You'll probably want to implement a lot of helper functions to make the above ea
 
 -}
 
+import CellGrid exposing (..)
 import Common exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import List exposing (..)
+import Models exposing (..)
+import MyCellGrid exposing (Msg)
 import Settings exposing (..)
 
 
@@ -44,8 +47,20 @@ if you will use it a lot.
 -}
 type alias Game =
     { settings : Settings
-    , count : Int
+    , gridSize : Int
+    , magnetism : Int
+    , board : Board
     , totalMoves : Int
+    , maxMoves : Int
+    , turn : Int
+    , players : Int
+    , playerPolarity : Polarity
+    }
+
+
+type alias GameMoveResult =
+    { status : Status
+    , game : Game
     }
 
 
@@ -56,8 +71,14 @@ init settings =
     let
         initialGame =
             { settings = settings
-            , count = settings.gridSize
-            , totalMoves = settings.gridSize
+            , gridSize = settings.gridSize
+            , magnetism = settings.magnetism
+            , board = emptyBoard (getBoardConfig settings)
+            , totalMoves = 0
+            , maxMoves = settings.maxMoves
+            , turn = 0
+            , players = settings.players
+            , playerPolarity = Negative
             }
     in
     ( initialGame, Cmd.none )
@@ -75,21 +96,58 @@ type Move
     = Increment
     | Decrement
     | Multiply
+    | SelectPolarity Polarity
+    | PlacePiece Coordinate
+
+
+type Status
+    = Success
+    | Failure
 
 
 {-| Apply a move to a game state, returning a new game state.
 -}
-applyMove : Move -> Game -> Game
+applyMove : Move -> Game -> GameMoveResult
 applyMove move game =
     case move of
         Increment ->
-            { game | count = game.count + 1, totalMoves = game.totalMoves + 1 }
+            { status = Success, game = { game | gridSize = game.gridSize + 1, magnetism = game.magnetism + 1 } }
 
         Decrement ->
-            { game | count = game.count - 1, totalMoves = game.totalMoves + 1 }
-        
-        Multiply -> 
-            { game | count = game.count * 2, totalMoves = game.totalMoves + 1 }
+            { status = Success, game = { game | gridSize = game.gridSize - 1, magnetism = game.magnetism + 1 } }
+
+        Multiply ->
+            { status = Success, game = { game | gridSize = game.gridSize * 2, magnetism = game.magnetism + 1 } }
+
+        SelectPolarity polarity ->
+            { status = Success, game = { game | playerPolarity = polarity } }
+
+        PlacePiece coordinate ->
+            case getPieceFromCoordinate game.board coordinate of
+                Just piece ->
+                    { status = Failure, game = game }
+
+                Nothing ->
+                    { status = Success, game = { game | board = insertPiece { color = determinePlayerColor game, polarity = game.playerPolarity } coordinate game.board } }
+
+
+determinePlayerColor : Game -> PlayerColor
+determinePlayerColor game =
+    case game.turn of
+        0 ->
+            Red
+
+        1 ->
+            Blue
+
+        2 ->
+            Green
+
+        3 ->
+            Yellow
+
+        _ ->
+            White
 
 
 
@@ -113,13 +171,42 @@ type Msg
     = ClickedIncrement
     | ClickedDecrement
     | ClickedMultiply
+    | ModelMsg Models.Msg
+    | SelectedPolarity Polarity
 
 
 {-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
 -}
-withCmd : Cmd Msg -> Game -> ( Game, Cmd Msg )
-withCmd cmd game =
+withCmd : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
+withCmd cmd { status, game } =
     ( game, cmd )
+
+
+
+{- Get Cell Coordinates from CellGrid Click -}
+
+
+determineCellCoordinates : MyCellGrid.Msg -> Coordinate
+determineCellCoordinates cellMsg =
+    { x = cellMsg.cell.column
+    , y = cellMsg.cell.row
+    }
+
+
+updateSuccessfulMove : GameMoveResult -> GameMoveResult
+updateSuccessfulMove { status, game } =
+    case status of
+        Success ->
+            { status = status
+            , game =
+                { game
+                    | totalMoves = game.totalMoves + 1
+                    , turn = modBy game.players (game.totalMoves + 1)
+                }
+            }
+
+        Failure ->
+            { status = status, game = game }
 
 
 {-| The main update function for the game, which takes an interface message and returns
@@ -137,7 +224,22 @@ update msg game =
             game
                 |> applyMove Decrement
                 |> withCmd Cmd.none
-        ClickedMultiply -> (withCmd Cmd.none (applyMove Multiply game))
+
+        ClickedMultiply ->
+            withCmd Cmd.none (applyMove Multiply game)
+
+        SelectedPolarity polarity ->
+            game
+                |> applyMove (SelectPolarity polarity)
+                |> withCmd Cmd.none
+
+        ModelMsg modelMsg ->
+            case modelMsg of
+                CellGridMessage cellmsg ->
+                    game
+                        |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
+                        |> updateSuccessfulMove
+                        |> withCmd Cmd.none
 
 
 
@@ -152,14 +254,92 @@ Essentially, takes a game and projects it into a HTML interface where Messages
 can be sent from.
 
 -}
+getBoardConfig : Settings -> BoardConfig
+getBoardConfig settings =
+    { displaySize = Basics.max 800 (settings.gridSize * 20)
+    , gridDimensions = settings.gridSize
+    }
+
+
+getBoardView : Game -> Html Msg
+getBoardView game =
+    Html.map ModelMsg
+        (div [ id "board-container" ]
+            [ boardHtml game.board
+            ]
+        )
+
+
+type alias GameDropdownGenericConfig enum =
+    { label : String
+    , onSelect : enum -> Msg
+    , toString : enum -> String
+    , fromString : String -> enum
+    , current : enum
+    , options : List ( String, enum )
+    }
+
+
+polarityDropDownConfig : Game -> GameDropdownGenericConfig Polarity
+polarityDropDownConfig game =
+    { label = "Player Polarity"
+    , onSelect = \polarity -> SelectedPolarity polarity
+    , toString = \polarity -> toPolarityString polarity
+    , fromString = \polarityString -> fromPolarityString polarityString
+    , current = game.playerPolarity
+    , options = [ ( "Positive", Positive ), ( "Negative", Negative ), ( "None", None ) ]
+    }
+
+
+type alias GamePickChoiceDropdownConfig =
+    { label : String
+    , onSelect : String -> Msg
+    , options : List PickChoiceDropdownOption
+    }
+
+
+genericConfigToDropdownConfig : GameDropdownGenericConfig enum -> GamePickChoiceDropdownConfig
+genericConfigToDropdownConfig { label, onSelect, toString, fromString, current, options } =
+    { label = label
+    , onSelect = fromString >> onSelect
+    , options = List.map (\( optionLabel, value ) -> { label = optionLabel, value = toString value, isSelected = value == current }) options
+    }
+
+
+viewPolarityDropdown : GamePickChoiceDropdownConfig -> Html Msg
+viewPolarityDropdown config =
+    div [ class "setting-picker-item" ]
+        [ label [ class "setting-picker-item-label" ] [ text config.label ]
+        , select [ class "setting-picker-item-input setting-picker-item-input-select", onInput config.onSelect ]
+            (List.map
+                (\optionData ->
+                    option [ value optionData.value, selected optionData.isSelected ] [ text optionData.label ]
+                )
+                config.options
+            )
+        ]
+
+
+getPolarityDropdown : Game -> Html Msg
+getPolarityDropdown game =
+    let
+        config =
+            genericConfigToDropdownConfig (polarityDropDownConfig game)
+    in
+    viewPolarityDropdown config
+
+
 view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
-        [ h1 [id "counter-value"] [ text ("Game Counter " ++ String.fromInt game.count) ]
-        , h2 [id "total-moves-value"] [ text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
-        , div [id "counter-buttons"]
+        [ h1 [ id "counter-value" ] [ text ("Game Remaining Moves " ++ String.fromInt (game.maxMoves - game.totalMoves)) ]
+        , h2 [ id "total-moves-value" ] [ text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
+        , div [ id "counter-buttons" ]
             [ button [ onClick ClickedDecrement ] [ text "-" ]
             , button [ onClick ClickedIncrement ] [ text "+" ]
-            , button [ onClick ClickedMultiply  ]  [ text "x2" ]
+            , button [ onClick ClickedMultiply ] [ text "x2" ]
             ]
+        , div [ id "polarity-dropdown" ]
+            [ getPolarityDropdown game ]
+        , getBoardView game
         ]
