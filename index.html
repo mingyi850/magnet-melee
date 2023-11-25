@@ -11157,7 +11157,7 @@ var $elm$svg$Svg$Attributes$textAnchor = _VirtualDom_attribute('text-anchor');
 var $elm$svg$Svg$text_ = $elm$svg$Svg$trustedNode('text');
 var $author$project$MyCellGrid$renderPiece = F3(
 	function (style, position, value) {
-		return _List_fromArray(
+		return style.shouldRenderPiece(value) ? _List_fromArray(
 			[
 				A2(
 				$elm$svg$Svg$circle,
@@ -11209,7 +11209,7 @@ var $author$project$MyCellGrid$renderPiece = F3(
 						$elm$svg$Svg$text(
 						style.toText(value))
 					]))
-			]);
+			]) : _List_Nil;
 	});
 var $author$project$MyCellGrid$asSvg = F2(
 	function (style, cellGrid) {
@@ -11268,42 +11268,84 @@ var $author$project$MyCellGrid$asHtml = F3(
 					A2($author$project$MyCellGrid$asSvg, cr, cellGrid)
 				]));
 	});
+var $author$project$Models$blendRGB = function (colors) {
+	var _v0 = A3(
+		$elm$core$List$foldl,
+		F2(
+			function (_v1, _v2) {
+				var r = _v1.a;
+				var g = _v1.b;
+				var b = _v1.c;
+				var r2 = _v2.a;
+				var g2 = _v2.b;
+				var b2 = _v2.c;
+				return _Utils_Tuple3(r + r2, g + g2, b + b2);
+			}),
+		_Utils_Tuple3(0, 0, 0),
+		colors);
+	var tr = _v0.a;
+	var tg = _v0.b;
+	var tb = _v0.c;
+	return _Utils_Tuple3(
+		tr / $elm$core$List$length(colors),
+		tg / $elm$core$List$length(colors),
+		tb / $elm$core$List$length(colors));
+};
 var $avh4$elm_color$Color$rgb = F3(
 	function (r, g, b) {
 		return A4($avh4$elm_color$Color$RgbaSpace, r, g, b, 1.0);
 	});
-var $author$project$Models$playerColorToColor = function (color) {
+var $author$project$Models$colorFromTuple = function (_v0) {
+	var r = _v0.a;
+	var g = _v0.b;
+	var b = _v0.c;
+	return A3($avh4$elm_color$Color$rgb, r, g, b);
+};
+var $author$project$Models$playerColorToRGB = function (color) {
 	switch (color.$) {
 		case 'Red':
-			return A3($avh4$elm_color$Color$rgb, 255, 0, 0);
+			return _Utils_Tuple3(255, 0, 0);
 		case 'Blue':
-			return A3($avh4$elm_color$Color$rgb, 0, 0, 255);
+			return _Utils_Tuple3(0, 0, 255);
 		case 'Green':
-			return A3($avh4$elm_color$Color$rgb, 0, 255, 0);
+			return _Utils_Tuple3(0, 255, 0);
 		case 'Yellow':
-			return A3($avh4$elm_color$Color$rgb, 255, 255, 0);
+			return _Utils_Tuple3(255, 255, 0);
 		default:
-			return A3($avh4$elm_color$Color$rgb, 255, 255, 255);
+			return _Utils_Tuple3(255, 255, 255);
 	}
 };
-var $author$project$Models$getColorFromMaybePiece = function (maybePiece) {
-	if (maybePiece.$ === 'Just') {
-		var piece = maybePiece.a;
-		return $author$project$Models$playerColorToColor(piece.color);
+var $avh4$elm_color$Color$white = A4($avh4$elm_color$Color$RgbaSpace, 255 / 255, 255 / 255, 255 / 255, 1.0);
+var $author$project$Models$getMergedCellColor = function (players) {
+	if (!players.b) {
+		return $avh4$elm_color$Color$white;
 	} else {
-		return A3($avh4$elm_color$Color$rgb, 1, 1, 1);
+		var playerColors = players;
+		return $author$project$Models$colorFromTuple(
+			$author$project$Models$blendRGB(
+				A2($elm$core$List$map, $author$project$Models$playerColorToRGB, playerColors)));
 	}
 };
-var $elm$core$Maybe$map = F2(
-	function (f, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return $elm$core$Maybe$Just(
-				f(value));
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	});
+var $author$project$Models$playerColorToColor = function (color) {
+	return $author$project$Models$colorFromTuple(
+		$author$project$Models$playerColorToRGB(color));
+};
+var $author$project$Models$getCellColorFromContent = function (content) {
+	switch (content.$) {
+		case 'GridPiece':
+			var piece = content.a;
+			return $author$project$Models$playerColorToColor(piece.color);
+		case 'NoContent':
+			return $avh4$elm_color$Color$white;
+		case 'GridMagneticField':
+			var field = content.a;
+			return $author$project$Models$getMergedCellColor(field.players);
+		default:
+			var piece = content.a;
+			var field = content.b;
+			return $author$project$Models$getMergedCellColor(field.players);
+	}
+};
 var $author$project$Models$toPolarityIcon = function (polarity) {
 	switch (polarity.$) {
 		case 'Positive':
@@ -11314,25 +11356,43 @@ var $author$project$Models$toPolarityIcon = function (polarity) {
 			return '';
 	}
 };
+var $author$project$Models$getTextFromContent = function (content) {
+	switch (content.$) {
+		case 'GridPiece':
+			var piece = content.a;
+			return $author$project$Models$toPolarityIcon(piece.polarity);
+		case 'NoContent':
+			return '';
+		case 'GridMagneticField':
+			var field = content.a;
+			return '';
+		default:
+			var piece = content.a;
+			var field = content.b;
+			return $author$project$Models$toPolarityIcon(piece.polarity);
+	}
+};
 var $author$project$Models$cellStyle = function (board) {
 	return {
 		cellHeight: (board.config.displaySize / board.config.gridDimensions) | 0,
 		cellWidth: (board.config.displaySize / board.config.gridDimensions) | 0,
 		gridLineColor: A3($avh4$elm_color$Color$rgb, 0, 0, 0),
 		gridLineWidth: 0.5,
-		toColor: function (z) {
-			return $author$project$Models$getColorFromMaybePiece(z);
+		shouldRenderPiece: function (content) {
+			switch (content.$) {
+				case 'GridPiece':
+					return true;
+				case 'PieceOnField':
+					return true;
+				default:
+					return false;
+			}
 		},
-		toText: function (piece) {
-			return A2(
-				$elm$core$Maybe$withDefault,
-				'',
-				A2(
-					$elm$core$Maybe$map,
-					function (p) {
-						return $author$project$Models$toPolarityIcon(p.polarity);
-					},
-					piece));
+		toColor: function (z) {
+			return $author$project$Models$getCellColorFromContent(z);
+		},
+		toText: function (content) {
+			return $author$project$Models$getTextFromContent(content);
 		}
 	};
 };
@@ -11340,9 +11400,200 @@ var $jxxcarlson$elm_cell_grid$CellGrid$Dimensions = F2(
 	function (rows, columns) {
 		return {columns: columns, rows: rows};
 	});
+var $author$project$Models$GridMagneticField = function (a) {
+	return {$: 'GridMagneticField', a: a};
+};
+var $author$project$Models$GridPiece = function (a) {
+	return {$: 'GridPiece', a: a};
+};
+var $author$project$Models$NoContent = {$: 'NoContent'};
+var $author$project$Models$PieceOnField = F2(
+	function (a, b) {
+		return {$: 'PieceOnField', a: a, b: b};
+	});
+var $author$project$Models$determineCellContent = F3(
+	function (magneticField, board, coordinate) {
+		var piece = A2($author$project$Models$getPieceFromCoordinate, board, coordinate);
+		var field = A2(
+			$elm$core$Dict$get,
+			$author$project$Models$toTuple(coordinate),
+			magneticField);
+		if (piece.$ === 'Just') {
+			var p = piece.a;
+			if (field.$ === 'Just') {
+				var f = field.a;
+				return A2($author$project$Models$PieceOnField, p, f);
+			} else {
+				return $author$project$Models$GridPiece(p);
+			}
+		} else {
+			if (field.$ === 'Just') {
+				var f = field.a;
+				return $author$project$Models$GridMagneticField(f);
+			} else {
+				return $author$project$Models$NoContent;
+			}
+		}
+	});
 var $author$project$Models$fromArgs = F2(
 	function (x, y) {
 		return {x: x, y: y};
+	});
+var $author$project$Models$movePieceCoordinate = F2(
+	function (coordinate, vector) {
+		return {x: coordinate.x + vector.x, y: coordinate.y + vector.y};
+	});
+var $author$project$Models$pieceMagneticField = F4(
+	function (vector, piece, currentCoordinate, remainingMagnetism) {
+		if (!remainingMagnetism) {
+			return _List_Nil;
+		} else {
+			var _v1 = piece.polarity;
+			switch (_v1.$) {
+				case 'Positive':
+					return A2(
+						$elm$core$List$cons,
+						_Utils_Tuple2(
+							A2($author$project$Models$movePieceCoordinate, currentCoordinate, vector),
+							{
+								negativeVector: {x: 0, y: 0},
+								players: _List_fromArray(
+									[piece.color]),
+								positiveVector: vector
+							}),
+						A4(
+							$author$project$Models$pieceMagneticField,
+							vector,
+							piece,
+							A2($author$project$Models$movePieceCoordinate, currentCoordinate, vector),
+							remainingMagnetism - 1));
+				case 'Negative':
+					return A2(
+						$elm$core$List$cons,
+						_Utils_Tuple2(
+							A2($author$project$Models$movePieceCoordinate, currentCoordinate, vector),
+							{
+								negativeVector: vector,
+								players: _List_fromArray(
+									[piece.color]),
+								positiveVector: {x: 0, y: 0}
+							}),
+						A4(
+							$author$project$Models$pieceMagneticField,
+							vector,
+							piece,
+							A2($author$project$Models$movePieceCoordinate, currentCoordinate, vector),
+							remainingMagnetism - 1));
+				default:
+					return _List_Nil;
+			}
+		}
+	});
+var $author$project$Models$pieceMagneticFieldDirs = _List_fromArray(
+	[
+		{x: 1, y: 0},
+		{x: 0, y: 1},
+		{x: -1, y: 0},
+		{x: 0, y: -1},
+		{x: 1, y: 1},
+		{x: -1, y: 1},
+		{x: -1, y: -1},
+		{x: 1, y: -1}
+	]);
+var $author$project$Models$getMagneticFieldFromPiece = F3(
+	function (board, magnetism, pieceCoordinate) {
+		var piece = A2($author$project$Models$getPieceFromCoordinate, board, pieceCoordinate);
+		if (piece.$ === 'Just') {
+			var p = piece.a;
+			return A2(
+				$elm$core$List$concatMap,
+				function (vector) {
+					return A4($author$project$Models$pieceMagneticField, vector, p, pieceCoordinate, magnetism);
+				},
+				$author$project$Models$pieceMagneticFieldDirs);
+		} else {
+			return _List_Nil;
+		}
+	});
+var $author$project$Models$mergeMagneticFields = F2(
+	function (field1, field2) {
+		return {
+			negativeVector: {x: field1.negativeVector.x + field2.negativeVector.x, y: field1.negativeVector.y + field2.negativeVector.y},
+			players: _Utils_ap(field1.players, field2.players),
+			positiveVector: {x: field1.positiveVector.x + field2.positiveVector.x, y: field1.positiveVector.y + field2.positiveVector.y}
+		};
+	});
+var $author$project$Models$updateMagneticFieldDict = F2(
+	function (fields, magneticFields) {
+		updateMagneticFieldDict:
+		while (true) {
+			if (!fields.b) {
+				return magneticFields;
+			} else {
+				var _v1 = fields.a;
+				var coordinate = _v1.a;
+				var field = _v1.b;
+				var rest = fields.b;
+				var currentField = A2(
+					$elm$core$Dict$get,
+					$author$project$Models$toTuple(coordinate),
+					magneticFields);
+				if (currentField.$ === 'Just') {
+					var f = currentField.a;
+					var newField = A2($author$project$Models$mergeMagneticFields, f, field);
+					var $temp$fields = rest,
+						$temp$magneticFields = A3(
+						$elm$core$Dict$insert,
+						$author$project$Models$toTuple(coordinate),
+						newField,
+						magneticFields);
+					fields = $temp$fields;
+					magneticFields = $temp$magneticFields;
+					continue updateMagneticFieldDict;
+				} else {
+					var $temp$fields = rest,
+						$temp$magneticFields = A3(
+						$elm$core$Dict$insert,
+						$author$project$Models$toTuple(coordinate),
+						field,
+						magneticFields);
+					fields = $temp$fields;
+					magneticFields = $temp$magneticFields;
+					continue updateMagneticFieldDict;
+				}
+			}
+		}
+	});
+var $author$project$Models$getBoardMagneticFieldRec = F4(
+	function (board, magnetism, pieceCoordinates, magneticFields) {
+		getBoardMagneticFieldRec:
+		while (true) {
+			if (!pieceCoordinates.b) {
+				return magneticFields;
+			} else {
+				var coordinate = pieceCoordinates.a;
+				var rest = pieceCoordinates.b;
+				var pieceFields = A3($author$project$Models$getMagneticFieldFromPiece, board, magnetism, coordinate);
+				var $temp$board = board,
+					$temp$magnetism = magnetism,
+					$temp$pieceCoordinates = rest,
+					$temp$magneticFields = A2($author$project$Models$updateMagneticFieldDict, pieceFields, magneticFields);
+				board = $temp$board;
+				magnetism = $temp$magnetism;
+				pieceCoordinates = $temp$pieceCoordinates;
+				magneticFields = $temp$magneticFields;
+				continue getBoardMagneticFieldRec;
+			}
+		}
+	});
+var $author$project$Models$getBoardMagneticField = F2(
+	function (board, magnetism) {
+		return A4(
+			$author$project$Models$getBoardMagneticFieldRec,
+			board,
+			magnetism,
+			$elm$core$Dict$values(board.pieceCoordinates),
+			$elm$core$Dict$empty);
 	});
 var $jxxcarlson$elm_cell_grid$CellGrid$initialize = F2(
 	function (dimensions, temperatureMap) {
@@ -11356,28 +11607,32 @@ var $jxxcarlson$elm_cell_grid$CellGrid$initialize = F2(
 			dimensions,
 			A2($elm$core$Array$initialize, dimensions.rows * dimensions.columns, helper));
 	});
-var $author$project$Models$getCellGrid = function (board) {
-	return A2(
-		$jxxcarlson$elm_cell_grid$CellGrid$initialize,
-		A2($jxxcarlson$elm_cell_grid$CellGrid$Dimensions, board.config.gridDimensions, board.config.gridDimensions),
-		F2(
-			function (i, j) {
-				return A2(
-					$author$project$Models$getPieceFromCoordinate,
-					board,
-					A2($author$project$Models$fromArgs, j, i));
-			}));
-};
-var $author$project$Models$boardHtml = function (board) {
-	return A2(
-		$elm$html$Html$map,
-		$author$project$Models$CellGridMessage,
-		A3(
-			$author$project$MyCellGrid$asHtml,
-			{height: board.config.displaySize, width: board.config.displaySize},
-			$author$project$Models$cellStyle(board),
-			$author$project$Models$getCellGrid(board)));
-};
+var $author$project$Models$getCellGrid = F2(
+	function (magnetism, board) {
+		var magneticField = A2($author$project$Models$getBoardMagneticField, board, magnetism);
+		return A2(
+			$jxxcarlson$elm_cell_grid$CellGrid$initialize,
+			A2($jxxcarlson$elm_cell_grid$CellGrid$Dimensions, board.config.gridDimensions, board.config.gridDimensions),
+			F2(
+				function (i, j) {
+					return A3(
+						$author$project$Models$determineCellContent,
+						magneticField,
+						board,
+						A2($author$project$Models$fromArgs, j, i));
+				}));
+	});
+var $author$project$Models$boardHtml = F2(
+	function (magnetism, board) {
+		return A2(
+			$elm$html$Html$map,
+			$author$project$Models$CellGridMessage,
+			A3(
+				$author$project$MyCellGrid$asHtml,
+				{height: board.config.displaySize, width: board.config.displaySize},
+				$author$project$Models$cellStyle(board),
+				A2($author$project$Models$getCellGrid, magnetism, board)));
+	});
 var $author$project$Game$getBoardView = function (game) {
 	return A2(
 		$elm$html$Html$map,
@@ -11390,7 +11645,7 @@ var $author$project$Game$getBoardView = function (game) {
 				]),
 			_List_fromArray(
 				[
-					$author$project$Models$boardHtml(game.board)
+					A2($author$project$Models$boardHtml, game.magnetism, game.board)
 				])));
 };
 var $author$project$Game$genericConfigToDropdownConfig = function (_v0) {

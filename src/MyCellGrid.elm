@@ -43,6 +43,7 @@ type alias CellStyle a =
     , toText : a -> String
     , gridLineWidth : Float
     , gridLineColor : Color
+    , shouldRenderPiece : a -> Bool
     }
 
 
@@ -87,34 +88,38 @@ asSvg style cellGrid =
 
 renderPiece : CellStyle a -> Position -> a -> List (Svg Msg)
 renderPiece style position value =
-    [ Svg.circle
-        [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
-        , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-        , Svg.Attributes.r (String.fromFloat (style.cellWidth / 2.5))
-        , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
-        , Svg.Attributes.fill (toCssString (style.toColor value))
-        , Svg.Attributes.stroke (toCssString style.gridLineColor)
-        , Svg.Attributes.fillOpacity "1"
-        , Mouse.onDown
-            (\r ->
-                let
-                    ( x, y ) =
-                        r.clientPos
-                in
-                { cell = position, coordinates = { x = x, y = y } }
-            )
+    if style.shouldRenderPiece value then
+        [ Svg.circle
+            [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
+            , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
+            , Svg.Attributes.r (String.fromFloat (style.cellWidth / 2.5))
+            , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
+            , Svg.Attributes.fill (toCssString (style.toColor value))
+            , Svg.Attributes.stroke (toCssString style.gridLineColor)
+            , Svg.Attributes.fillOpacity "1"
+            , Mouse.onDown
+                (\r ->
+                    let
+                        ( x, y ) =
+                            r.clientPos
+                    in
+                    { cell = position, coordinates = { x = x, y = y } }
+                )
+            ]
+            []
+        , Svg.text_
+            [ Svg.Attributes.x (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
+            , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
+            , Svg.Attributes.textAnchor "middle"
+            , Svg.Attributes.alignmentBaseline "middle"
+            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2.5))
+            , Svg.Attributes.fill (toCssString Color.black)
+            ]
+            [ Svg.text (style.toText value) ]
         ]
+
+    else
         []
-    , Svg.text_
-        [ Svg.Attributes.x (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
-        , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-        , Svg.Attributes.textAnchor "middle"
-        , Svg.Attributes.alignmentBaseline "middle"
-        , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2.5))
-        , Svg.Attributes.fill (toCssString Color.black)
-        ]
-        [ Svg.text (style.toText value) ]
-    ]
 
 
 renderCell : CellStyle a -> Position -> a -> Svg Msg
