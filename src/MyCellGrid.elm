@@ -39,7 +39,8 @@ import Svg.Attributes
 type alias CellStyle a =
     { cellWidth : Float
     , cellHeight : Float
-    , toColor : a -> Color
+    , toCellColor : a -> Color
+    , toPieceColor : a -> Color
     , toText : a -> String
     , gridLineWidth : Float
     , gridLineColor : Color
@@ -94,9 +95,10 @@ renderPiece style position value =
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.r (String.fromFloat (style.cellWidth / 2.5))
             , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
-            , Svg.Attributes.fill (toCssString (style.toColor value))
+            , Svg.Attributes.fill (toCssString (style.toPieceColor value))
             , Svg.Attributes.stroke (toCssString style.gridLineColor)
             , Svg.Attributes.fillOpacity "1"
+            , Svg.Attributes.z "500"
             , Mouse.onDown
                 (\r ->
                     let
@@ -114,6 +116,7 @@ renderPiece style position value =
             , Svg.Attributes.alignmentBaseline "middle"
             , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2.5))
             , Svg.Attributes.fill (toCssString Color.black)
+            , Svg.Attributes.z "1000"
             ]
             [ Svg.text (style.toText value) ]
         ]
@@ -130,7 +133,7 @@ renderCell style position value =
         , Svg.Attributes.x (String.fromFloat (style.cellWidth * toFloat position.column))
         , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row))
         , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
-        , Svg.Attributes.fill (toCssString (style.toColor value))
+        , Svg.Attributes.fill (toCssString (style.toCellColor value))
         , Svg.Attributes.stroke (toCssString style.gridLineColor)
         , Svg.Attributes.fillOpacity "0.5"
         , Mouse.onDown

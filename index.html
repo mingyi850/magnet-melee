@@ -11124,7 +11124,7 @@ var $author$project$MyCellGrid$renderCell = F3(
 					$elm$core$String$fromFloat(style.gridLineWidth)),
 					$elm$svg$Svg$Attributes$fill(
 					$author$project$MyCellGrid$toCssString(
-						style.toColor(value))),
+						style.toCellColor(value))),
 					$elm$svg$Svg$Attributes$stroke(
 					$author$project$MyCellGrid$toCssString(style.gridLineColor)),
 					$elm$svg$Svg$Attributes$fillOpacity('0.5'),
@@ -11155,6 +11155,7 @@ var $elm$svg$Svg$Attributes$r = _VirtualDom_attribute('r');
 var $elm$svg$Svg$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$svg$Svg$Attributes$textAnchor = _VirtualDom_attribute('text-anchor');
 var $elm$svg$Svg$text_ = $elm$svg$Svg$trustedNode('text');
+var $elm$svg$Svg$Attributes$z = _VirtualDom_attribute('z');
 var $author$project$MyCellGrid$renderPiece = F3(
 	function (style, position, value) {
 		return style.shouldRenderPiece(value) ? _List_fromArray(
@@ -11173,10 +11174,11 @@ var $author$project$MyCellGrid$renderPiece = F3(
 						$elm$core$String$fromFloat(style.gridLineWidth)),
 						$elm$svg$Svg$Attributes$fill(
 						$author$project$MyCellGrid$toCssString(
-							style.toColor(value))),
+							style.toPieceColor(value))),
 						$elm$svg$Svg$Attributes$stroke(
 						$author$project$MyCellGrid$toCssString(style.gridLineColor)),
 						$elm$svg$Svg$Attributes$fillOpacity('1'),
+						$elm$svg$Svg$Attributes$z('500'),
 						$mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onDown(
 						function (r) {
 							var _v0 = r.clientPos;
@@ -11202,7 +11204,8 @@ var $author$project$MyCellGrid$renderPiece = F3(
 						$elm$svg$Svg$Attributes$fontSize(
 						$elm$core$String$fromFloat(style.cellWidth / 2.5)),
 						$elm$svg$Svg$Attributes$fill(
-						$author$project$MyCellGrid$toCssString($avh4$elm_color$Color$black))
+						$author$project$MyCellGrid$toCssString($avh4$elm_color$Color$black)),
+						$elm$svg$Svg$Attributes$z('1000')
 					]),
 				_List_fromArray(
 					[
@@ -11341,9 +11344,20 @@ var $author$project$Models$getCellColorFromContent = function (content) {
 			var field = content.a;
 			return $author$project$Models$getMergedCellColor(field.players);
 		default:
-			var piece = content.a;
 			var field = content.b;
 			return $author$project$Models$getMergedCellColor(field.players);
+	}
+};
+var $author$project$Models$getPieceColorFromContent = function (content) {
+	switch (content.$) {
+		case 'GridPiece':
+			var piece = content.a;
+			return $author$project$Models$playerColorToColor(piece.color);
+		case 'PieceOnField':
+			var piece = content.a;
+			return $author$project$Models$playerColorToColor(piece.color);
+		default:
+			return $avh4$elm_color$Color$white;
 	}
 };
 var $author$project$Models$toPolarityIcon = function (polarity) {
@@ -11388,8 +11402,11 @@ var $author$project$Models$cellStyle = function (board) {
 					return false;
 			}
 		},
-		toColor: function (z) {
+		toCellColor: function (z) {
 			return $author$project$Models$getCellColorFromContent(z);
+		},
+		toPieceColor: function (z) {
+			return $author$project$Models$getPieceColorFromContent(z);
 		},
 		toText: function (content) {
 			return $author$project$Models$getTextFromContent(content);

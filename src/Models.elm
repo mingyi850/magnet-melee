@@ -382,9 +382,22 @@ getCellColorFromContent content =
             field.players
                 |> getMergedCellColor
 
-        PieceOnField piece field ->
+        PieceOnField _ field ->
             field.players
                 |> getMergedCellColor
+
+
+getPieceColorFromContent : CellContent -> Color.Color
+getPieceColorFromContent content =
+    case content of
+        GridPiece piece ->
+            playerColorToColor piece.color
+
+        PieceOnField piece _ ->
+            playerColorToColor piece.color
+
+        _ ->
+            Color.white
 
 
 getMergedCellColor : List PlayerColor -> Color.Color
@@ -416,7 +429,8 @@ getTextFromContent content =
 
 cellStyle : Board -> MyCellGrid.CellStyle CellContent
 cellStyle board =
-    { toColor = \z -> getCellColorFromContent z
+    { toCellColor = \z -> getCellColorFromContent z
+    , toPieceColor = \z -> getPieceColorFromContent z
     , toText = \content -> getTextFromContent content
     , cellWidth = toFloat (board.config.displaySize // board.config.gridDimensions)
     , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
