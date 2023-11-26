@@ -22,7 +22,9 @@ import Html.Events exposing (..)
 import List exposing (..)
 import Models exposing (..)
 import MyCellGrid exposing (Msg)
+import Process
 import Settings exposing (..)
+import Task
 
 
 
@@ -173,13 +175,19 @@ type Msg
     | ClickedMultiply
     | ModelMsg Models.Msg
     | SelectedPolarity Polarity
+    | UpdateBoard
 
 
 {-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
 -}
 withCmd : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
 withCmd cmd { status, game } =
-    ( game, cmd )
+    case status of
+        Success ->
+            ( game, cmd )
+
+        Failure ->
+            ( game, Cmd.none )
 
 
 
@@ -207,6 +215,27 @@ updateSuccessfulMove { status, game } =
 
         Failure ->
             { status = status, game = game }
+
+
+updateGameBoard : Game -> GameMoveResult
+updateGameBoard game =
+    let
+        newGame =
+            { game
+                | board = updateBoardMagneticField (updatePiecePositions (updateBoardMagneticField game.board game.magnetism)) game.magnetism
+            }
+    in
+    if newGame == game then
+        { status = Failure, game = newGame }
+
+    else
+        { status = Success, game = newGame }
+
+
+send : Float -> msg -> Cmd msg
+send wait msg =
+    Process.sleep wait
+        |> Task.perform (\_ -> msg)
 
 
 {-| The main update function for the game, which takes an interface message and returns
@@ -239,7 +268,11 @@ update msg game =
                     game
                         |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
                         |> updateSuccessfulMove
-                        |> withCmd Cmd.none
+                        |> withCmd (send 1000.0 UpdateBoard)
+
+        UpdateBoard ->
+            updateGameBoard game
+                |> withCmd (send 1000.0 UpdateBoard)
 
 
 
@@ -265,7 +298,7 @@ getBoardView : Game -> Html Msg
 getBoardView game =
     Html.map ModelMsg
         (div [ id "board-container" ]
-            [ boardHtml game.magnetism game.board
+            [ boardHtml game.board
             ]
         )
 

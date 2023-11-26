@@ -41,6 +41,7 @@ type alias CellStyle a =
     , cellHeight : Float
     , toCellColor : a -> Color
     , toPieceColor : a -> Color
+    , toCellOpacity : a -> Float
     , toText : a -> String
     , gridLineWidth : Float
     , gridLineColor : Color
@@ -135,7 +136,7 @@ renderCell style position value =
         , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
         , Svg.Attributes.fill (toCssString (style.toCellColor value))
         , Svg.Attributes.stroke (toCssString style.gridLineColor)
-        , Svg.Attributes.fillOpacity "0.5"
+        , Svg.Attributes.fillOpacity (style.toCellOpacity value |> String.fromFloat)
         , Mouse.onDown
             (\r ->
                 let

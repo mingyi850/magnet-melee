@@ -188,6 +188,11 @@ view screen =
 --------------------------------------------------------------------------------
 
 
+subscriptions : Sub Msg
+subscriptions =
+    Sub.none
+
+
 {-| The actual main entrypoint to run the application.
 
 If your game isn't too complicated, you probably don't need to modify this at all.
@@ -204,5 +209,5 @@ main =
         { view = view
         , init = \_ -> init
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = always subscriptions
         }
