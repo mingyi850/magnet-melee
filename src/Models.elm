@@ -474,6 +474,10 @@ movePieceCoordinate coordinate vector =
     { x = coordinate.x + vector.x, y = coordinate.y + vector.y }
 
 
+
+{- TODO: Implement proper collision logic -}
+
+
 movePiece : Board -> Int -> IntVector -> Board
 movePiece board pieceIndex vector =
     let
