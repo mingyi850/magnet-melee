@@ -49,6 +49,11 @@ type alias CellStyle a =
     }
 
 
+type InteractionType
+    = Click
+    | Hover
+
+
 {-| Capture clicks on the rendered cell grid. Gives the position in the cell grid, and the local `(x, y)` coordinates of the cell
 -}
 type alias Msg =
@@ -57,6 +62,7 @@ type alias Msg =
         { x : Float
         , y : Float
         }
+    , interaction : InteractionType
     }
 
 
@@ -88,6 +94,16 @@ asSvg style cellGrid =
     Svg.g [] (boxes ++ pieces)
 
 
+onMouseDown : Position -> Mouse.Event -> Msg
+onMouseDown position =
+    \r ->
+        let
+            ( x, y ) =
+                r.clientPos
+        in
+        { cell = position, coordinates = { x = x, y = y }, interaction = Click }
+
+
 renderPiece : CellStyle a -> Position -> a -> List (Svg Msg)
 renderPiece style position value =
     if style.shouldRenderPiece value then
@@ -100,14 +116,7 @@ renderPiece style position value =
             , Svg.Attributes.stroke (toCssString style.gridLineColor)
             , Svg.Attributes.fillOpacity "1"
             , Svg.Attributes.z "500"
-            , Mouse.onDown
-                (\r ->
-                    let
-                        ( x, y ) =
-                            r.clientPos
-                    in
-                    { cell = position, coordinates = { x = x, y = y } }
-                )
+            , Mouse.onDown (onMouseDown position)
             ]
             []
         , Svg.text_
@@ -118,6 +127,7 @@ renderPiece style position value =
             , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2.5))
             , Svg.Attributes.fill (toCssString Color.black)
             , Svg.Attributes.z "1000"
+            , Mouse.onDown (onMouseDown position)
             ]
             [ Svg.text (style.toText value) ]
         ]
@@ -137,13 +147,14 @@ renderCell style position value =
         , Svg.Attributes.fill (toCssString (style.toCellColor value))
         , Svg.Attributes.stroke (toCssString style.gridLineColor)
         , Svg.Attributes.fillOpacity (style.toCellOpacity value |> String.fromFloat)
-        , Mouse.onDown
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver
             (\r ->
                 let
                     ( x, y ) =
                         r.clientPos
                 in
-                { cell = position, coordinates = { x = x, y = y } }
+                { cell = position, coordinates = { x = x, y = y }, interaction = Hover }
             )
         ]
         []

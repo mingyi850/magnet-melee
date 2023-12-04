@@ -22,7 +22,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import List exposing (..)
 import Models exposing (..)
-import MyCellGrid exposing (Msg)
+import MyCellGrid exposing (InteractionType(..), Msg)
 import Process
 import Round exposing (..)
 import Settings exposing (..)
@@ -118,6 +118,7 @@ type Move
     | Multiply
     | SelectPolarity Polarity
     | PlacePiece Coordinate
+    | DisplayPiece Coordinate
 
 
 type Status
@@ -148,7 +149,22 @@ applyMove move game =
                     { status = Failure, game = game }
 
                 Nothing ->
-                    { status = Success, game = { game | board = insertPiece { player = game.turn, polarity = game.playerPolarity } coordinate game.board } }
+                    { status = Success
+                    , game =
+                        { game
+                            | board =
+                                removeTentativePieces game.board
+                                    |> insertPiece { player = game.turn, polarity = game.playerPolarity } coordinate
+                        }
+                    }
+
+        DisplayPiece coordinate ->
+            case getPieceFromCoordinate game.board coordinate of
+                Just piece ->
+                    { status = Failure, game = game }
+
+                Nothing ->
+                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = game.playerPolarity } coordinate game.board |> updateBoardMagneticField game.magnetism } }
 
 
 getGameScore : Game -> Dict Int Float
@@ -243,6 +259,14 @@ updatePlayerScores players scoreDict =
         players
 
 
+updateGameBoardMagneticField : Game -> GameMoveResult
+updateGameBoardMagneticField game =
+    { status = Success
+    , game =
+        { game | board = updateBoardMagneticField game.magnetism game.board }
+    }
+
+
 updateGameBoard : Game -> GameMoveResult
 updateGameBoard game =
     let
@@ -251,7 +275,7 @@ updateGameBoard game =
 
         newGame =
             { game
-                | board = updateBoardMagneticField (updatePiecePositions (updateBoardMagneticField game.board game.magnetism)) game.magnetism
+                | board = updateBoardMagneticField game.magnetism (updatePiecePositions (updateBoardMagneticField game.magnetism game.board))
                 , players = updatePlayerScores game.players gameScores
             }
     in
@@ -313,10 +337,17 @@ update msg game =
                 CellGridMessage cellmsg ->
                     case game.status of
                         Ready ->
-                            game
-                                |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
-                                |> updateSuccessfulMove game.turn
-                                |> withCmd (send 200.0 UpdateBoard)
+                            case cellmsg.interaction of
+                                Click ->
+                                    game
+                                        |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
+                                        |> updateSuccessfulMove game.turn
+                                        |> withCmd (send 200.0 UpdateBoard)
+
+                                Hover ->
+                                    game
+                                        |> applyMove (DisplayPiece (determineCellCoordinates cellmsg))
+                                        |> withCmd Cmd.none
 
                         _ ->
                             ( game, Cmd.none )
