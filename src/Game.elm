@@ -24,6 +24,7 @@ import List exposing (..)
 import Models exposing (..)
 import MyCellGrid exposing (Msg)
 import Process
+import Round exposing (..)
 import Settings exposing (..)
 import Task
 import Utils exposing (..)
@@ -55,11 +56,10 @@ type alias Game =
     , magnetism : Int
     , board : Board
     , totalMoves : Int
-    , maxMoves : Int
     , turn : Int
-    , players : Int
+    , players : Dict Int Player
     , playerPolarity : Polarity
-    , scores : Dict Int Float
+    , status : GameStatus
     }
 
 
@@ -67,6 +67,19 @@ type alias GameMoveResult =
     { status : Status
     , game : Game
     }
+
+
+type alias Player =
+    { remainingMoves : Int
+    , polarity : Polarity
+    , score : Float
+    }
+
+
+type GameStatus
+    = Ready
+    | Processing
+    | GameOver
 
 
 {-| Create the initial game data given the settings.
@@ -80,11 +93,10 @@ init settings =
             , magnetism = settings.magnetism
             , board = emptyBoard (getBoardConfig settings)
             , totalMoves = 0
-            , maxMoves = settings.maxMoves
             , turn = 0
-            , players = settings.players
+            , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0 } )) |> Dict.fromList
             , playerPolarity = Negative
-            , scores = range 0 (settings.players - 1) |> List.map (\player -> ( player, 0.0 )) |> Dict.fromList
+            , status = Ready
             }
     in
     ( initialGame, Cmd.none )
@@ -141,7 +153,7 @@ getGameScore : Game -> Dict Int Float
 getGameScore game =
     let
         scores =
-            Dict.fromList (range 0 (game.players - 1) |> List.map (\player -> ( player, 0.0 )))
+            Dict.fromList (range 0 (Dict.size game.players - 1) |> List.map (\player -> ( player, 0.0 )))
 
         boardScores =
             getBoardScores game.board
@@ -198,36 +210,70 @@ determineCellCoordinates cellMsg =
     }
 
 
-updateSuccessfulMove : GameMoveResult -> GameMoveResult
-updateSuccessfulMove { status, game } =
+updateSuccessfulMove : Int -> GameMoveResult -> GameMoveResult
+updateSuccessfulMove player { status, game } =
     case status of
         Success ->
             { status = status
             , game =
                 { game
-                    | totalMoves = game.totalMoves + 1
-                    , turn = modBy game.players (game.totalMoves + 1)
+                    | players =
+                        Dict.update player (Maybe.map (\playerData -> { playerData | remainingMoves = playerData.remainingMoves - 1 })) game.players
+                    , totalMoves = game.totalMoves + 1
+                    , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
+                    , status = Processing
                 }
+                    |> checkGameOver
             }
 
         Failure ->
             { status = status, game = game }
 
 
+updatePlayerScores : Dict Int Player -> Dict Int Float -> Dict Int Player
+updatePlayerScores players scoreDict =
+    Dict.map
+        (\player playerData ->
+            { playerData
+                | score = Dict.get player scoreDict |> Maybe.withDefault 0.0
+            }
+        )
+        players
+
+
 updateGameBoard : Game -> GameMoveResult
 updateGameBoard game =
     let
+        gameScores =
+            getGameScore game
+
         newGame =
             { game
                 | board = updateBoardMagneticField (updatePiecePositions (updateBoardMagneticField game.board game.magnetism)) game.magnetism
-                , scores = getGameScore game
+                , players = updatePlayerScores game.players gameScores
             }
     in
     if newGame == game then
-        { status = Failure, game = newGame }
+        case game.status of
+            Processing ->
+                { status = Failure, game = { newGame | status = Ready } }
+
+            _ ->
+                { status = Failure, game = newGame }
+        -- No more changes, stop sending update message
 
     else
         { status = Success, game = newGame }
+
+
+checkGameOver : Game -> Game
+checkGameOver game =
+    -- Check if all remaining moves for all players is 0 or less
+    if Dict.foldl (\player playerData accum -> (playerData.remainingMoves <= 0) && accum) True game.players then
+        { game | status = GameOver }
+
+    else
+        game
 
 
 send : Float -> msg -> Cmd msg
@@ -263,10 +309,15 @@ update msg game =
         ModelMsg modelMsg ->
             case modelMsg of
                 CellGridMessage cellmsg ->
-                    game
-                        |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
-                        |> updateSuccessfulMove
-                        |> withCmd (send 200.0 UpdateBoard)
+                    case game.status of
+                        Ready ->
+                            game
+                                |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
+                                |> updateSuccessfulMove game.turn
+                                |> withCmd (send 200.0 UpdateBoard)
+
+                        _ ->
+                            ( game, Cmd.none )
 
         UpdateBoard ->
             updateGameBoard game
@@ -362,23 +413,17 @@ getPolarityDropdown game =
 view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
-        [ h1 [ id "counter-value" ] [ text ("Game Remaining Moves " ++ String.fromInt (game.maxMoves - game.totalMoves)) ]
-        , h2 [ id "total-moves-value" ] [ text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
-        , div [ id "counter-buttons" ]
-            [ button [ onClick ClickedDecrement ] [ text "-" ]
-            , button [ onClick ClickedIncrement ] [ text "+" ]
-            , button [ onClick ClickedMultiply ] [ text "x2" ]
-            ]
-        , div [ id "polarity-dropdown" ]
+        [ h2 [ id "total-moves-value" ] [ text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
+        , div [ id "polarity-dropdown", class "grid-container" ]
             [ getPolarityDropdown game ]
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game
-            , div [ id "game-score-container" ]
-                [ text "Player 1:"
-                , text (String.fromFloat (Dict.get 0 game.scores |> Maybe.withDefault 0.0))
-                , text "Player 2:"
-                , text (String.fromFloat (Dict.get 1 game.scores |> Maybe.withDefault 0.0))
+            , div [ id "game-score-container", class "player-display-container" ]
+                [ div [ id "player-1-container" ]
+                    [ text ("Player 1: " ++ Round.round 3 (Dict.get 0 game.players |> Maybe.map (\p -> p.score) |> Maybe.withDefault 0.0)) ]
+                , div
+                    [ id "player-2-container" ]
+                    [ text ("Player 2: " ++ Round.round 3 (Dict.get 1 game.players |> Maybe.map (\p -> p.score) |> Maybe.withDefault 0.0)) ]
                 ]
             ]
-        , div [ id "some-random-text", class "flex-container" ] [ text "Some random text" ]
         ]

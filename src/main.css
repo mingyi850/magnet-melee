@@ -279,7 +279,9 @@ button#restart-button:active {
   flex-direction: row;
 }
 
-#game-board {
+.player-display-container {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
 }

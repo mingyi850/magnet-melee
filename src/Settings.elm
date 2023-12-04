@@ -59,7 +59,7 @@ default : Settings
 default =
     { gridSize = 10
     , magnetism = 3
-    , maxMoves = 10
+    , maxMoves = 5
     , players = 2
     }
 
