@@ -14,7 +14,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   font-family: "Segoe UI", Arial, Helvetica, system-ui, sans-serif;
@@ -25,7 +26,8 @@ html, body {
 /* STYLED DEFAULTS
 /* --------------------------------------------------------------------------- */
 
-input, select {
+input,
+select {
   padding: 5px;
   font-family: inherit;
 }
@@ -116,7 +118,8 @@ button.selected {
   border-bottom: 1px solid #94a3b8;
 }
 
-#settings-modal-header-title, #settings-modal-header-team {
+#settings-modal-header-title,
+#settings-modal-header-team {
   margin: 0;
   padding: 0;
 }
@@ -161,7 +164,8 @@ button.selected {
   display: flex;
 }
 
-.setting-picker-item-input-int-range, .setting-picker-item-input-float-range {
+.setting-picker-item-input-int-range,
+.setting-picker-item-input-float-range {
   margin: 0 1rem;
   flex: 1;
 }
@@ -189,7 +193,7 @@ button.selected {
 #start-game-button {
   background-color: #333;
   color: white;
-  border-color: #000; 
+  border-color: #000;
   flex: 1;
   font-size: 1.5rem;
   text-transform: uppercase;
@@ -241,7 +245,7 @@ button#restart-button:active {
   min-width: 640px;
   border: 1px solid #64748b;
   padding: 2rem;
-  border: 1px solid 
+  border: 1px solid
 }
 
 #counter-value {
@@ -264,4 +268,18 @@ button#restart-button:active {
   font-weight: bold;
   width: 8rem;
   height: 8rem;
+}
+
+/* --------------------------------------------------------------------------- */
+/* My Custom Styles
+/* --------------------------------------------------------------------------- */
+
+.grid-container {
+  display: flex;
+  flex-direction: row;
+}
+
+#game-board {
+  display: flex;
+  flex-direction: row;
 }

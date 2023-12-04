@@ -123,8 +123,8 @@ pickers settings =
     , inputIntRange
         { label = "Magnetism"
         , value = settings.magnetism
-        , min = 0
-        , max = 50
+        , min = 2
+        , max = 30
         , onChange = SetMagnetism
         }
     ]

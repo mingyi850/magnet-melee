@@ -2,11 +2,19 @@ module Models exposing (..)
 
 import CellGrid exposing (..)
 import Color exposing (..)
+import Common exposing (Player)
 import Dict exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import MyCellGrid exposing (..)
+import Utils exposing (..)
+
+
+
+{-------------------------------------------------
+   Model and Message Types
+-------------------------------------------------}
 
 
 type Msg
@@ -21,11 +29,104 @@ type PlayerColor
     | White
 
 
+toPlayerNumber : PlayerColor -> Int
+toPlayerNumber color =
+    case color of
+        Red ->
+            0
+
+        Blue ->
+            1
+
+        Green ->
+            2
+
+        Yellow ->
+            3
+
+        White ->
+            4
+
+
+getPlayerColor : Int -> PlayerColor
+getPlayerColor number =
+    case number of
+        0 ->
+            Red
+
+        1 ->
+            Blue
+
+        2 ->
+            Green
+
+        3 ->
+            Yellow
+
+        4 ->
+            White
+
+        _ ->
+            Red
+
+
 type alias MagneticField =
     { positiveVector : Vector
     , negativeVector : Vector
-    , players : List PlayerColor
+    , players : List Int
     }
+
+
+type alias Piece =
+    { player : Int
+    , polarity : Polarity
+    }
+
+
+type alias Board =
+    { pieces : Dict Int Piece
+    , pieceCoordinates : Dict Int Coordinate
+    , coordinatePieces : Dict ( Int, Int ) Int
+    , magneticField : Dict ( Int, Int ) MagneticField
+    , config : BoardConfig
+    }
+
+
+type alias Coordinate =
+    { x : Int
+    , y : Int
+    }
+
+
+type alias BoardConfig =
+    { gridDimensions : Int
+    , displaySize : Int
+    }
+
+
+type CellContent
+    = GridPiece Piece
+    | NoContent
+    | GridMagneticField MagneticField
+    | PieceOnField Piece MagneticField
+
+
+type alias Vector =
+    { x : Float
+    , y : Float
+    }
+
+
+type alias IntVector =
+    { x : Int
+    , y : Int
+    }
+
+
+
+{-------------------------------------------------
+   Utility Functions
+-------------------------------------------------}
 
 
 playerColorToRGB : PlayerColor -> ( Float, Float, Float )
@@ -111,40 +212,6 @@ toPolarityIcon polarity =
             ""
 
 
-type alias Piece =
-    { color : PlayerColor
-    , polarity : Polarity
-    }
-
-
-type alias Board =
-    { pieces : Dict Int Piece
-    , pieceCoordinates : Dict Int Coordinate
-    , coordinatePieces : Dict ( Int, Int ) Int
-    , magneticField : Dict ( Int, Int ) MagneticField
-    , config : BoardConfig
-    }
-
-
-type alias Coordinate =
-    { x : Int
-    , y : Int
-    }
-
-
-type alias BoardConfig =
-    { gridDimensions : Int
-    , displaySize : Int
-    }
-
-
-type CellContent
-    = GridPiece Piece
-    | NoContent
-    | GridMagneticField MagneticField
-    | PieceOnField Piece MagneticField
-
-
 toTuple : Coordinate -> ( Int, Int )
 toTuple coordinate =
     ( coordinate.x, coordinate.y )
@@ -163,18 +230,6 @@ fromArgs x y =
 toString : Coordinate -> String
 toString coordinate =
     "(" ++ String.fromInt coordinate.x ++ "," ++ String.fromInt coordinate.y ++ ")"
-
-
-type alias Vector =
-    { x : Float
-    , y : Float
-    }
-
-
-type alias IntVector =
-    { x : Int
-    , y : Int
-    }
 
 
 negative : Vector -> Vector
@@ -228,8 +283,64 @@ getPieceFromCoordinate board coordinate =
     Maybe.andThen (\index -> Dict.get index board.pieces) pieceIndex
 
 
-pieceMagneticField : Vector -> Piece -> Coordinate -> Int -> List ( Coordinate, MagneticField )
-pieceMagneticField vector piece currentCoordinate remainingMagnetism =
+combineVectors : Vector -> Vector -> Vector
+combineVectors vector1 vector2 =
+    { x = vector1.x + vector2.x, y = vector1.y + vector2.y }
+
+
+increaseVectorMagnitude : Vector -> Vector
+increaseVectorMagnitude vector =
+    let
+        newX =
+            if vector.x == 0 then
+                0
+
+            else if vector.x > 0 then
+                vector.x + 1
+
+            else
+                vector.x - 1
+
+        newY =
+            if vector.y == 0 then
+                0
+
+            else if vector.y > 0 then
+                vector.y + 1
+
+            else
+                vector.y - 1
+    in
+    { x = newX, y = newY }
+
+
+
+{-------------------------------------------------
+   Magnetic Field Calculation Functions
+-------------------------------------------------}
+
+
+calculateMagneticField : Int -> Vector -> Vector
+calculateMagneticField magnetism distanceVector =
+    let
+        distance =
+            Basics.sqrt (distanceVector.x ^ 2 + distanceVector.y ^ 2)
+
+        magnitude =
+            toFloat magnetism / (distance ^ 2)
+
+        unitVector =
+            unit distanceVector
+    in
+    { x = toFloat unitVector.x * magnitude, y = toFloat unitVector.y * magnitude }
+
+
+pieceMagneticField : Int -> Vector -> Piece -> Coordinate -> Int -> List ( Coordinate, MagneticField )
+pieceMagneticField magnetism distanceVector piece currentCoordinate remainingMagnetism =
+    let
+        vector =
+            calculateMagneticField magnetism distanceVector
+    in
     case remainingMagnetism of
         0 ->
             []
@@ -237,10 +348,10 @@ pieceMagneticField vector piece currentCoordinate remainingMagnetism =
         _ ->
             case piece.polarity of
                 Positive ->
-                    ( movePieceCoordinate currentCoordinate (unit vector), { positiveVector = vector, negativeVector = { x = 0, y = 0 }, players = [ piece.color ] } ) :: pieceMagneticField (reduceVectorMagnitude vector) piece (movePieceCoordinate currentCoordinate (unit vector)) (remainingMagnetism - 1)
+                    ( movePieceCoordinate currentCoordinate (unit vector), { positiveVector = vector, negativeVector = { x = 0, y = 0 }, players = [ piece.player ] } ) :: pieceMagneticField magnetism (increaseVectorMagnitude distanceVector) piece (movePieceCoordinate currentCoordinate (unit vector)) (remainingMagnetism - 1)
 
                 Negative ->
-                    ( movePieceCoordinate currentCoordinate (unit vector), { positiveVector = { x = 0, y = 0 }, negativeVector = vector, players = [ piece.color ] } ) :: pieceMagneticField (reduceVectorMagnitude vector) piece (movePieceCoordinate currentCoordinate (unit vector)) (remainingMagnetism - 1)
+                    ( movePieceCoordinate currentCoordinate (unit vector), { positiveVector = { x = 0, y = 0 }, negativeVector = vector, players = [ piece.player ] } ) :: pieceMagneticField magnetism (increaseVectorMagnitude distanceVector) piece (movePieceCoordinate currentCoordinate (unit vector)) (remainingMagnetism - 1)
 
                 None ->
                     []
@@ -248,18 +359,14 @@ pieceMagneticField vector piece currentCoordinate remainingMagnetism =
 
 pieceMagneticFieldDirs : Float -> List Vector
 pieceMagneticFieldDirs magnitude =
-    let
-        diagonalMagnitude =
-            Basics.sqrt (magnitude ^ 2 + magnitude ^ 2)
-    in
-    [ { x = magnitude, y = 0 }
-    , { x = 0, y = magnitude }
-    , { x = -magnitude, y = 0 }
-    , { x = 0, y = -magnitude }
-    , { x = diagonalMagnitude, y = diagonalMagnitude }
-    , { x = -diagonalMagnitude, y = diagonalMagnitude }
-    , { x = -diagonalMagnitude, y = -diagonalMagnitude }
-    , { x = diagonalMagnitude, y = -diagonalMagnitude }
+    [ { x = 1, y = 0 }
+    , { x = 0, y = 1 }
+    , { x = -1, y = 0 }
+    , { x = 0, y = -1 }
+    , { x = 1, y = 1 }
+    , { x = -1, y = 1 }
+    , { x = -1, y = -1 }
+    , { x = 1, y = -1 }
     ]
 
 
@@ -271,47 +378,10 @@ getMagneticFieldFromPiece board magnetism pieceCoordinate =
     in
     case piece of
         Just p ->
-            List.concatMap (\vector -> pieceMagneticField vector p pieceCoordinate magnetism) (pieceMagneticFieldDirs (toFloat magnetism))
+            List.concatMap (\vector -> pieceMagneticField magnetism vector p pieceCoordinate magnetism) (pieceMagneticFieldDirs (toFloat magnetism))
 
         Nothing ->
             []
-
-
-combineVectors : Vector -> Vector -> Vector
-combineVectors vector1 vector2 =
-    { x = vector1.x + vector2.x, y = vector1.y + vector2.y }
-
-
-reduceVectorMagnitude : Vector -> Vector
-reduceVectorMagnitude vector =
-    let
-        unitVector =
-            unit vector
-
-        reduction =
-            Basics.sqrt (toFloat ((unitVector.x ^ 2) + (unitVector.y ^ 2)))
-
-        newX =
-            if vector.x == 0 then
-                0
-
-            else if vector.x > 0 then
-                vector.x - reduction
-
-            else
-                vector.x + reduction
-
-        newY =
-            if vector.y == 0 then
-                0
-
-            else if vector.y > 0 then
-                vector.y - reduction
-
-            else
-                vector.y + reduction
-    in
-    { x = newX, y = newY }
 
 
 mergeMagneticFields : MagneticField -> MagneticField -> MagneticField
@@ -424,36 +494,10 @@ getMovementVectorForMagnet field piece =
             { x = 0, y = 0 }
 
 
-determineCellContent : Dict ( Int, Int ) MagneticField -> Board -> Coordinate -> CellContent
-determineCellContent magneticField board coordinate =
-    let
-        piece =
-            getPieceFromCoordinate board coordinate
 
-        field =
-            Dict.get (toTuple coordinate) magneticField
-    in
-    case piece of
-        Just p ->
-            case field of
-                Just f ->
-                    PieceOnField p f
-
-                Nothing ->
-                    GridPiece p
-
-        Nothing ->
-            case field of
-                Just f ->
-                    GridMagneticField f
-
-                Nothing ->
-                    NoContent
-
-
-getCellGrid : Board -> CellGrid CellContent
-getCellGrid board =
-    CellGrid.initialize (Dimensions board.config.gridDimensions board.config.gridDimensions) (\i j -> determineCellContent board.magneticField board (fromArgs j i))
+{-------------------------------------------------
+   Piece Movement and Insertion Functions
+-------------------------------------------------}
 
 
 insertPiece : Piece -> Coordinate -> Board -> Board
@@ -472,10 +516,6 @@ insertPiece piece coordinate board =
 movePieceCoordinate : Coordinate -> IntVector -> Coordinate
 movePieceCoordinate coordinate vector =
     { x = coordinate.x + vector.x, y = coordinate.y + vector.y }
-
-
-
-{- TODO: Implement proper collision logic -}
 
 
 movePiece : Board -> Int -> IntVector -> Board
@@ -523,7 +563,73 @@ movePiece board pieceIndex vector =
 
 
 
--- View Helpers
+{-------------------------------------------------
+   Score Functions
+-------------------------------------------------}
+
+
+getFieldScore : MagneticField -> Dict Int Float
+getFieldScore field =
+    let
+        numPlayers =
+            toFloat (List.length field.players)
+    in
+    field.players
+        |> List.map (\player -> ( player, 1 / numPlayers ))
+        |> Dict.fromList
+
+
+getBoardScores : Board -> Dict Int Float
+getBoardScores board =
+    let
+        playerDict =
+            Dict.fromList [ ( 0, 0 ), ( 1, 0 ), ( 2, 0 ), ( 3, 0 ) ]
+    in
+    Dict.foldl (\coordinate field existing -> addDicts existing (getFieldScore field)) playerDict board.magneticField
+
+
+
+{-------------------------------------------------
+   View Helper Functions
+-------------------------------------------------}
+
+
+determineCellContent : Dict ( Int, Int ) MagneticField -> Board -> Coordinate -> CellContent
+determineCellContent magneticField board coordinate =
+    let
+        piece =
+            getPieceFromCoordinate board coordinate
+
+        field =
+            Dict.get (toTuple coordinate) magneticField
+    in
+    case piece of
+        Just p ->
+            case field of
+                Just f ->
+                    PieceOnField p f
+
+                Nothing ->
+                    GridPiece p
+
+        Nothing ->
+            case field of
+                Just f ->
+                    GridMagneticField f
+
+                Nothing ->
+                    NoContent
+
+
+
+{-
+   Cell Grid Specific View Functions
+-}
+
+
+getCellGrid : Board -> CellGrid CellContent
+getCellGrid board =
+    CellGrid.initialize (Dimensions board.config.gridDimensions board.config.gridDimensions) (\i j -> determineCellContent board.magneticField board (fromArgs j i))
 
 
 boardHtml : Board -> Html Msg
@@ -541,11 +647,11 @@ getCellColorFromContent content =
             Color.white
 
         GridMagneticField field ->
-            field.players
+            List.map (\player -> getPlayerColor player) field.players
                 |> getMergedCellColor
 
         PieceOnField _ field ->
-            field.players
+            List.map (\player -> getPlayerColor player) field.players
                 |> getMergedCellColor
 
 
@@ -569,10 +675,10 @@ getPieceColorFromContent : CellContent -> Color.Color
 getPieceColorFromContent content =
     case content of
         GridPiece piece ->
-            playerColorToColor piece.color
+            playerColorToColor (getPlayerColor piece.player)
 
         PieceOnField piece _ ->
-            playerColorToColor piece.color
+            playerColorToColor (getPlayerColor piece.player)
 
         _ ->
             Color.white
@@ -614,7 +720,7 @@ cellStyle board =
     , cellWidth = toFloat (board.config.displaySize // board.config.gridDimensions)
     , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
     , gridLineColor = Color.rgb 0 0 0
-    , gridLineWidth = 0.5
+    , gridLineWidth = 5
     , shouldRenderPiece =
         \content ->
             case content of

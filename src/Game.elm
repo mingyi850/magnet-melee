@@ -16,6 +16,7 @@ You'll probably want to implement a lot of helper functions to make the above ea
 
 import CellGrid exposing (..)
 import Common exposing (..)
+import Dict exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -25,6 +26,7 @@ import MyCellGrid exposing (Msg)
 import Process
 import Settings exposing (..)
 import Task
+import Utils exposing (..)
 
 
 
@@ -57,6 +59,7 @@ type alias Game =
     , turn : Int
     , players : Int
     , playerPolarity : Polarity
+    , scores : Dict Int Float
     }
 
 
@@ -81,6 +84,7 @@ init settings =
             , turn = 0
             , players = settings.players
             , playerPolarity = Negative
+            , scores = range 0 (settings.players - 1) |> List.map (\player -> ( player, 0.0 )) |> Dict.fromList
             }
     in
     ( initialGame, Cmd.none )
@@ -130,26 +134,19 @@ applyMove move game =
                     { status = Failure, game = game }
 
                 Nothing ->
-                    { status = Success, game = { game | board = insertPiece { color = determinePlayerColor game, polarity = game.playerPolarity } coordinate game.board } }
+                    { status = Success, game = { game | board = insertPiece { player = game.turn, polarity = game.playerPolarity } coordinate game.board } }
 
 
-determinePlayerColor : Game -> PlayerColor
-determinePlayerColor game =
-    case game.turn of
-        0 ->
-            Red
+getGameScore : Game -> Dict Int Float
+getGameScore game =
+    let
+        scores =
+            Dict.fromList (range 0 (game.players - 1) |> List.map (\player -> ( player, 0.0 )))
 
-        1 ->
-            Blue
-
-        2 ->
-            Green
-
-        3 ->
-            Yellow
-
-        _ ->
-            White
+        boardScores =
+            getBoardScores game.board
+    in
+    addDicts scores boardScores
 
 
 
@@ -223,6 +220,7 @@ updateGameBoard game =
         newGame =
             { game
                 | board = updateBoardMagneticField (updatePiecePositions (updateBoardMagneticField game.board game.magnetism)) game.magnetism
+                , scores = getGameScore game
             }
     in
     if newGame == game then
@@ -268,11 +266,11 @@ update msg game =
                     game
                         |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
                         |> updateSuccessfulMove
-                        |> withCmd (send 1000.0 UpdateBoard)
+                        |> withCmd (send 200.0 UpdateBoard)
 
         UpdateBoard ->
             updateGameBoard game
-                |> withCmd (send 1000.0 UpdateBoard)
+                |> withCmd (send 200.0 UpdateBoard)
 
 
 
@@ -289,7 +287,7 @@ can be sent from.
 -}
 getBoardConfig : Settings -> BoardConfig
 getBoardConfig settings =
-    { displaySize = Basics.max 800 (settings.gridSize * 20)
+    { displaySize = Basics.max 800 settings.gridSize
     , gridDimensions = settings.gridSize
     }
 
@@ -298,8 +296,7 @@ getBoardView : Game -> Html Msg
 getBoardView game =
     Html.map ModelMsg
         (div [ id "board-container" ]
-            [ boardHtml game.board
-            ]
+            [ boardHtml game.board ]
         )
 
 
@@ -374,5 +371,14 @@ view game =
             ]
         , div [ id "polarity-dropdown" ]
             [ getPolarityDropdown game ]
-        , getBoardView game
+        , div [ id "game-board", class "grid-container" ]
+            [ getBoardView game
+            , div [ id "game-score-container" ]
+                [ text "Player 1:"
+                , text (String.fromFloat (Dict.get 0 game.scores |> Maybe.withDefault 0.0))
+                , text "Player 2:"
+                , text (String.fromFloat (Dict.get 1 game.scores |> Maybe.withDefault 0.0))
+                ]
+            ]
+        , div [ id "some-random-text", class "flex-container" ] [ text "Some random text" ]
         ]

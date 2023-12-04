@@ -10566,7 +10566,7 @@ var $author$project$Models$emptyBoard = function (boardConfig) {
 };
 var $author$project$Game$getBoardConfig = function (settings) {
 	return {
-		displaySize: A2($elm$core$Basics$max, 800, settings.gridSize * 20),
+		displaySize: A2($elm$core$Basics$max, 800, settings.gridSize),
 		gridDimensions: settings.gridSize
 	};
 };
@@ -10754,10 +10754,6 @@ var $author$project$Game$send = F2(
 			},
 			$elm$core$Process$sleep(wait));
 	});
-var $author$project$Models$movePieceCoordinate = F2(
-	function (coordinate, vector) {
-		return {x: coordinate.x + vector.x, y: coordinate.y + vector.y};
-	});
 var $elm$core$Basics$pow = _Basics_pow;
 var $elm$core$Basics$sqrt = _Basics_sqrt;
 var $author$project$Models$unit = function (vector) {
@@ -10765,16 +10761,26 @@ var $author$project$Models$unit = function (vector) {
 	var x = (!vector.x) ? 0 : ((vector.x > 0) ? 1 : (-1));
 	return {x: x, y: y};
 };
-var $author$project$Models$reduceVectorMagnitude = function (vector) {
-	var unitVector = $author$project$Models$unit(vector);
-	var reduction = $elm$core$Basics$sqrt(
-		A2($elm$core$Basics$pow, unitVector.x, 2) + A2($elm$core$Basics$pow, unitVector.y, 2));
-	var newY = (!vector.y) ? 0 : ((vector.y > 0) ? (vector.y - reduction) : (vector.y + reduction));
-	var newX = (!vector.x) ? 0 : ((vector.x > 0) ? (vector.x - reduction) : (vector.x + reduction));
+var $author$project$Models$calculateMagneticField = F2(
+	function (magnetism, distanceVector) {
+		var unitVector = $author$project$Models$unit(distanceVector);
+		var distance = $elm$core$Basics$sqrt(
+			A2($elm$core$Basics$pow, distanceVector.x, 2) + A2($elm$core$Basics$pow, distanceVector.y, 2));
+		var magnitude = magnetism / A2($elm$core$Basics$pow, distance, 2);
+		return {x: unitVector.x * magnitude, y: unitVector.y * magnitude};
+	});
+var $author$project$Models$increaseVectorMagnitude = function (vector) {
+	var newY = (!vector.y) ? 0 : ((vector.y > 0) ? (vector.y + 1) : (vector.y - 1));
+	var newX = (!vector.x) ? 0 : ((vector.x > 0) ? (vector.x + 1) : (vector.x - 1));
 	return {x: newX, y: newY};
 };
-var $author$project$Models$pieceMagneticField = F4(
-	function (vector, piece, currentCoordinate, remainingMagnetism) {
+var $author$project$Models$movePieceCoordinate = F2(
+	function (coordinate, vector) {
+		return {x: coordinate.x + vector.x, y: coordinate.y + vector.y};
+	});
+var $author$project$Models$pieceMagneticField = F5(
+	function (magnetism, distanceVector, piece, currentCoordinate, remainingMagnetism) {
+		var vector = A2($author$project$Models$calculateMagneticField, magnetism, distanceVector);
 		if (!remainingMagnetism) {
 			return _List_Nil;
 		} else {
@@ -10794,9 +10800,10 @@ var $author$project$Models$pieceMagneticField = F4(
 									[piece.color]),
 								positiveVector: vector
 							}),
-						A4(
+						A5(
 							$author$project$Models$pieceMagneticField,
-							$author$project$Models$reduceVectorMagnitude(vector),
+							magnetism,
+							$author$project$Models$increaseVectorMagnitude(distanceVector),
 							piece,
 							A2(
 								$author$project$Models$movePieceCoordinate,
@@ -10817,9 +10824,10 @@ var $author$project$Models$pieceMagneticField = F4(
 									[piece.color]),
 								positiveVector: {x: 0, y: 0}
 							}),
-						A4(
+						A5(
 							$author$project$Models$pieceMagneticField,
-							$author$project$Models$reduceVectorMagnitude(vector),
+							magnetism,
+							$author$project$Models$increaseVectorMagnitude(distanceVector),
 							piece,
 							A2(
 								$author$project$Models$movePieceCoordinate,
@@ -10832,18 +10840,16 @@ var $author$project$Models$pieceMagneticField = F4(
 		}
 	});
 var $author$project$Models$pieceMagneticFieldDirs = function (magnitude) {
-	var diagonalMagnitude = $elm$core$Basics$sqrt(
-		A2($elm$core$Basics$pow, magnitude, 2) + A2($elm$core$Basics$pow, magnitude, 2));
 	return _List_fromArray(
 		[
-			{x: magnitude, y: 0},
-			{x: 0, y: magnitude},
-			{x: -magnitude, y: 0},
-			{x: 0, y: -magnitude},
-			{x: diagonalMagnitude, y: diagonalMagnitude},
-			{x: -diagonalMagnitude, y: diagonalMagnitude},
-			{x: -diagonalMagnitude, y: -diagonalMagnitude},
-			{x: diagonalMagnitude, y: -diagonalMagnitude}
+			{x: 1, y: 0},
+			{x: 0, y: 1},
+			{x: -1, y: 0},
+			{x: 0, y: -1},
+			{x: 1, y: 1},
+			{x: -1, y: 1},
+			{x: -1, y: -1},
+			{x: 1, y: -1}
 		]);
 };
 var $author$project$Models$getMagneticFieldFromPiece = F3(
@@ -10854,7 +10860,7 @@ var $author$project$Models$getMagneticFieldFromPiece = F3(
 			return A2(
 				$elm$core$List$concatMap,
 				function (vector) {
-					return A4($author$project$Models$pieceMagneticField, vector, p, pieceCoordinate, magnetism);
+					return A5($author$project$Models$pieceMagneticField, magnetism, vector, p, pieceCoordinate, magnetism);
 				},
 				$author$project$Models$pieceMagneticFieldDirs(magnetism));
 		} else {
@@ -11164,7 +11170,7 @@ var $author$project$Game$update = F2(
 				var cellmsg = modelMsg.a;
 				return A2(
 					$author$project$Game$withCmd,
-					A2($author$project$Game$send, 1000.0, $author$project$Game$UpdateBoard),
+					A2($author$project$Game$send, 200.0, $author$project$Game$UpdateBoard),
 					$author$project$Game$updateSuccessfulMove(
 						A2(
 							$author$project$Game$applyMove,
@@ -11174,7 +11180,7 @@ var $author$project$Game$update = F2(
 			default:
 				return A2(
 					$author$project$Game$withCmd,
-					A2($author$project$Game$send, 1000.0, $author$project$Game$UpdateBoard),
+					A2($author$project$Game$send, 200.0, $author$project$Game$UpdateBoard),
 					$author$project$Game$updateGameBoard(game));
 		}
 	});
@@ -11786,7 +11792,7 @@ var $author$project$Models$cellStyle = function (board) {
 		cellHeight: (board.config.displaySize / board.config.gridDimensions) | 0,
 		cellWidth: (board.config.displaySize / board.config.gridDimensions) | 0,
 		gridLineColor: A3($avh4$elm_color$Color$rgb, 0, 0, 0),
-		gridLineWidth: 0.5,
+		gridLineWidth: 5,
 		shouldRenderPiece: function (content) {
 			switch (content.$) {
 				case 'GridPiece':
@@ -11893,16 +11899,7 @@ var $author$project$Game$getBoardView = function (game) {
 	return A2(
 		$elm$html$Html$map,
 		$author$project$Game$ModelMsg,
-		A2(
-			$elm$html$Html$div,
-			_List_fromArray(
-				[
-					$elm$html$Html$Attributes$id('board-container')
-				]),
-			_List_fromArray(
-				[
-					$author$project$Models$boardHtml(game.board)
-				])));
+		$author$project$Models$boardHtml(game.board));
 };
 var $author$project$Game$genericConfigToDropdownConfig = function (_v0) {
 	var label = _v0.label;
@@ -12115,7 +12112,38 @@ var $author$project$Game$view = function (game) {
 					[
 						$author$project$Game$getPolarityDropdown(game)
 					])),
-				$author$project$Game$getBoardView(game)
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$id('game-board'),
+						$elm$html$Html$Attributes$class('grid-container')
+					]),
+				_List_fromArray(
+					[
+						$author$project$Game$getBoardView(game),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$id('texttings')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('HERE I AM')
+							]))
+					])),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$id('some-random-text'),
+						$elm$html$Html$Attributes$class('flex-container')
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text('Some random text')
+					]))
 			]));
 };
 var $author$project$Settings$SetGridSize = function (a) {
@@ -12136,7 +12164,7 @@ var $author$project$Settings$pickers = function (settings) {
 			$author$project$Settings$inputIntRange(
 			{label: 'GridSize', max: 100, min: 3, onChange: $author$project$Settings$SetGridSize, value: settings.gridSize}),
 			$author$project$Settings$inputIntRange(
-			{label: 'Magnetism', max: 50, min: 0, onChange: $author$project$Settings$SetMagnetism, value: settings.magnetism})
+			{label: 'Magnetism', max: 30, min: 2, onChange: $author$project$Settings$SetMagnetism, value: settings.magnetism})
 		]);
 };
 var $elm$core$List$filter = F2(
