@@ -279,9 +279,25 @@ button#restart-button:active {
   flex-direction: row;
 }
 
+.player-number-container {
+  display: flex;
+  align-items: center;
+}
+
 .player-display-container {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
   align-items: center;
+  margin-left: 50px;
+}
+
+.player-color {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.player-container>div {
+  margin: -10px;
 }

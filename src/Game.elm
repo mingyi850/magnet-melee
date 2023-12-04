@@ -26,6 +26,8 @@ import MyCellGrid exposing (Msg)
 import Process
 import Round exposing (..)
 import Settings exposing (..)
+import Svg exposing (..)
+import Svg.Attributes
 import Task
 import Utils exposing (..)
 
@@ -390,11 +392,11 @@ genericConfigToDropdownConfig { label, onSelect, toString, fromString, current, 
 viewPolarityDropdown : GamePickChoiceDropdownConfig -> Html Msg
 viewPolarityDropdown config =
     div [ class "setting-picker-item" ]
-        [ label [ class "setting-picker-item-label" ] [ text config.label ]
+        [ label [ class "setting-picker-item-label" ] [ Html.text config.label ]
         , select [ class "setting-picker-item-input setting-picker-item-input-select", onInput config.onSelect ]
             (List.map
                 (\optionData ->
-                    option [ value optionData.value, selected optionData.isSelected ] [ text optionData.label ]
+                    option [ value optionData.value, selected optionData.isSelected ] [ Html.text optionData.label ]
                 )
                 config.options
             )
@@ -410,20 +412,36 @@ getPolarityDropdown game =
     viewPolarityDropdown config
 
 
+getPlayerContainers : Game -> List (Html Msg)
+getPlayerContainers game =
+    Dict.values (Dict.map (\index playerData -> playerContainer index playerData) game.players)
+
+
+playerContainer : Int -> Player -> Html Msg
+playerContainer playerNum player =
+    div [ class "player-container" ]
+        [ div [ class "player-number-container" ]
+            [ h1 [ id "player-num" ]
+                [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]
+            , div [ id "player-color-indicator", class "player-color" ] [ Svg.svg [] [ Svg.circle [ Svg.Attributes.cx "20%", Svg.Attributes.cy "50%", Svg.Attributes.r "5%", Svg.Attributes.fill (toCssString (playerColorToColor (getPlayerColor playerNum))) ] [] ] ]
+            ]
+        , div [ class "player-moves-container" ] [ h2 [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
+        , div [ class "player-polarity-container" ] [ h2 [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
+        , div [ class "player-score-container" ]
+            [ h2 [ id "score-box" ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
+        ]
+
+
 view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
-        [ h2 [ id "total-moves-value" ] [ text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
+        [ h1 [ id "game-header" ] [ Html.text "Magnet Melee!!!" ]
+        , h2 [ id "total-moves-value" ] [ Html.text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
         , div [ id "polarity-dropdown", class "grid-container" ]
             [ getPolarityDropdown game ]
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game
             , div [ id "game-score-container", class "player-display-container" ]
-                [ div [ id "player-1-container" ]
-                    [ text ("Player 1: " ++ Round.round 3 (Dict.get 0 game.players |> Maybe.map (\p -> p.score) |> Maybe.withDefault 0.0)) ]
-                , div
-                    [ id "player-2-container" ]
-                    [ text ("Player 2: " ++ Round.round 3 (Dict.get 1 game.players |> Maybe.map (\p -> p.score) |> Maybe.withDefault 0.0)) ]
-                ]
+                (getPlayerContainers game)
             ]
         ]
