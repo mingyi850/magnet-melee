@@ -354,7 +354,9 @@ update msg game =
 
         UpdateBoard magnitude previousStates ->
             if List.member game.board previousStates then
-                ( { game | status = Ready }, Cmd.none )
+                updateGameBoard (magnitude + 1) game
+                    |> withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
+                {- ( { game | status = Ready }, Cmd.none ) -}
 
             else
                 updateGameBoard magnitude game
