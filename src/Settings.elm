@@ -12,6 +12,7 @@ I've outlined the five steps below under SETTING DEFINITIONS.
 
 -}
 
+import Array exposing (..)
 import Common exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -47,6 +48,7 @@ type alias Settings =
     , magnetism : Int
     , maxMoves : Int
     , players : Int
+    , playerAI : Array Int
     }
 
 
@@ -61,6 +63,7 @@ default =
     , magnetism = 3
     , maxMoves = 5
     , players = 2
+    , playerAI = Array.repeat 2 0
     }
 
 
@@ -75,6 +78,7 @@ type Msg
     | SetMagnetism Int
     | SetNumMoves Int
     | SetNumPlayers Int
+    | SetPlayerAi Int Int
 
 
 {-| STEP 4: Define explicitly what happens to your settings when a message is received.
@@ -97,6 +101,9 @@ update msg settings =
 
         SetNumPlayers players ->
             { settings | players = players }
+
+        SetPlayerAi player ai ->
+            { settings | playerAI = Array.set player ai settings.playerAI }
 
 
 {-| STEP 5: Define a list of pickers for each setting you want to be able to change.
@@ -124,15 +131,15 @@ pickers settings =
     [ inputIntRange
         { label = "GridSize"
         , value = settings.gridSize
-        , min = 3
-        , max = 100
+        , min = 5
+        , max = 50
         , onChange = SetGridSize
         }
     , inputIntRange
         { label = "Magnetism"
         , value = settings.magnetism
         , min = 2
-        , max = 30
+        , max = settings.gridSize // 2
         , onChange = SetMagnetism
         }
     , inputIntRange
@@ -142,14 +149,27 @@ pickers settings =
         , max = 30
         , onChange = SetNumMoves
         }
-    , inputIntRange
+    , pickChoiceButtons
         { label = "Number of Players"
-        , value = settings.players
-        , min = 1
-        , max = 4
-        , onChange = SetNumPlayers
+        , onSelect = SetNumPlayers
+        , current = settings.players
+        , options = [ ( "2", 2 ), ( "3", 3 ), ( "4", 4 ) ]
         }
     ]
+
+
+aiPickers : Settings -> List SettingPickerItem
+aiPickers settings =
+    List.map
+        (\player ->
+            pickChoiceButtons
+                { label = "Player " ++ String.fromInt (player + 1)
+                , onSelect = SetPlayerAi player
+                , current = Maybe.withDefault 0 (Array.get player settings.playerAI)
+                , options = [ ( "Human", 0 ), ( "Easy", 1 ), ( "Medium", 2 ) ]
+                }
+        )
+        (List.range 0 (settings.players - 1))
 
 
 
@@ -482,9 +502,9 @@ viewPickerItem item =
 
 {-| View just the picker part of the settings
 -}
-viewPicker : List SettingPickerItem -> Html Msg
-viewPicker items =
-    div [ id "settings-picker" ]
+viewPicker : String -> List SettingPickerItem -> Html Msg
+viewPicker name items =
+    div [ id ("settings-picker-" ++ name) ]
         (List.map viewPickerItem items)
 
 
@@ -493,5 +513,7 @@ viewPicker items =
 view : Settings -> Html Msg
 view settings =
     div [ id "settings" ]
-        [ viewPicker (pickers settings)
+        [ viewPicker "main"
+            (pickers settings)
+        , viewPicker "ai" (aiPickers settings)
         ]

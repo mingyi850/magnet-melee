@@ -14,6 +14,7 @@ You'll probably want to implement a lot of helper functions to make the above ea
 
 -}
 
+import Array exposing (..)
 import CellGrid exposing (..)
 import Common exposing (..)
 import Dict exposing (..)
@@ -71,17 +72,41 @@ type alias GameMoveResult =
     }
 
 
+type Agent
+    = Human
+    | AIEasy
+    | AIMedium
+
+
+getAgentFromInt : Int -> Agent
+getAgentFromInt agent =
+    case agent of
+        0 ->
+            Human
+
+        1 ->
+            AIEasy
+
+        2 ->
+            AIMedium
+
+        _ ->
+            Human
+
+
 type alias Player =
     { remainingMoves : Int
     , polarity : Polarity
     , score : Float
+    , agent : Agent
     }
 
 
 type GameStatus
-    = Ready
+    = HumanMove
     | Processing
     | GameOver
+    | AI Int
 
 
 {-| Create the initial game data given the settings.
@@ -96,9 +121,9 @@ init settings =
             , board = emptyBoard (getBoardConfig settings)
             , totalMoves = 0
             , turn = 0
-            , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0 } )) |> Dict.fromList
+            , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0, agent = getAgentFromInt (Maybe.withDefault 0 (Array.get player settings.playerAI)) } )) |> Dict.fromList
             , playerPolarity = Negative
-            , status = Ready
+            , status = HumanMove
             }
     in
     ( initialGame, Cmd.none )
@@ -117,13 +142,20 @@ type Move
     | Decrement
     | Multiply
     | SelectPolarity Int Polarity
-    | PlacePiece Coordinate
-    | DisplayPiece Coordinate
+    | PlacePiece Coordinate Polarity
+    | DisplayPiece Coordinate Polarity
 
 
 type Status
     = Success
     | Failure
+
+
+type alias MoveData =
+    { x : Int
+    , y : Int
+    , polarity : Polarity
+    }
 
 
 {-| Apply a move to a game state, returning a new game state.
@@ -143,7 +175,7 @@ applyMove move game =
         SelectPolarity player polarity ->
             { status = Success, game = updatePlayerPolarity player polarity game }
 
-        PlacePiece coordinate ->
+        PlacePiece coordinate polarity ->
             case getPieceFromCoordinate game.board coordinate of
                 Just piece ->
                     { status = Failure, game = game }
@@ -154,17 +186,17 @@ applyMove move game =
                         { game
                             | board =
                                 removeTentativePieces game.board
-                                    |> insertPiece { player = game.turn, polarity = getPlayerPolarity game.turn game } coordinate
+                                    |> insertPiece { player = game.turn, polarity = polarity } coordinate
                         }
                     }
 
-        DisplayPiece coordinate ->
+        DisplayPiece coordinate polarity ->
             case getPieceFromCoordinate game.board coordinate of
                 Just piece ->
                     { status = Failure, game = game }
 
                 Nothing ->
-                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = getPlayerPolarity game.turn game } coordinate game.board |> updateBoardMagneticField game.magnetism } }
+                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } coordinate game.board |> updateBoardMagneticField game.magnetism } }
 
 
 getGameScore : Game -> Dict Int Float
@@ -182,6 +214,11 @@ getGameScore game =
 getPlayerPolarity : Int -> Game -> Polarity
 getPlayerPolarity player game =
     Maybe.withDefault Negative (Maybe.map (\playerData -> playerData.polarity) (Dict.get player game.players))
+
+
+getPlayerAgency : Int -> Game -> Agent
+getPlayerAgency player game =
+    Maybe.withDefault Human (Maybe.map (\playerData -> playerData.agent) (Dict.get player game.players))
 
 
 
@@ -206,6 +243,7 @@ type Msg
     | ClickedDecrement
     | ClickedMultiply
     | ModelMsg Models.Msg
+    | GetAIMove
     | UpdateBoard Int (List Board)
     | UpdatePlayerPolarity Int Polarity
 
@@ -287,7 +325,7 @@ updateGameBoard magnitude game =
     if newGame == game then
         case game.status of
             Processing ->
-                { status = Failure, game = { newGame | status = Ready } }
+                { status = Failure, game = { newGame | status = getGameStatus game } }
 
             _ ->
                 { status = Failure, game = newGame }
@@ -295,6 +333,19 @@ updateGameBoard magnitude game =
 
     else
         { status = Success, game = newGame }
+
+
+getGameStatus : Game -> GameStatus
+getGameStatus game =
+    case getPlayerAgency game.turn game of
+        Human ->
+            HumanMove
+
+        AIEasy ->
+            AI 0
+
+        AIMedium ->
+            AI 1
 
 
 updatePlayerPolarity : Int -> Polarity -> Game -> Game
@@ -349,17 +400,17 @@ update msg game =
             case modelMsg of
                 CellGridMessage cellmsg ->
                     case game.status of
-                        Ready ->
+                        HumanMove ->
                             case cellmsg.interaction of
                                 Click ->
                                     game
-                                        |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
+                                        |> applyMove (PlacePiece (determineCellCoordinates cellmsg) (getPlayerPolarity game.turn game))
                                         |> updateSuccessfulMove game.turn
                                         |> withCmd (send 200.0 (UpdateBoard 1 []))
 
                                 Hover ->
                                     game
-                                        |> applyMove (DisplayPiece (determineCellCoordinates cellmsg))
+                                        |> applyMove (DisplayPiece (determineCellCoordinates cellmsg) (getPlayerPolarity game.turn game))
                                         |> withCmd Cmd.none
 
                         _ ->
@@ -374,6 +425,51 @@ update msg game =
             else
                 updateGameBoard magnitude game
                     |> withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
+
+        GetAIMove ->
+            case game.status of
+                AI x ->
+                    let
+                        aiMove =
+                            getAIMove x game
+                    in
+                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity ) game
+                        |> updateSuccessfulMove game.turn
+                        |> withCmd (send 100.0 GetAIMove)
+
+                _ ->
+                    ( game, Cmd.none )
+
+
+getAIMove : Int -> Game -> MoveData
+getAIMove level game =
+    case level of
+        0 ->
+            getAIMoveEasy game.board
+
+        1 ->
+            getAIMoveEasy game.board
+
+        _ ->
+            getAIMoveEasy game.board
+
+
+determineUpdateComand : Int -> List Board -> GameMoveResult -> Cmd Msg
+determineUpdateComand magnitude previousStates { status, game } =
+    case status of
+        Success ->
+            case game.status of
+                Processing ->
+                    send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
+
+                AI _ ->
+                    send 100.0 GetAIMove
+
+                _ ->
+                    Cmd.none
+
+        Failure ->
+            Cmd.none
 
 
 
@@ -540,7 +636,9 @@ playerContainer playerNum player game =
 view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
-        [ h1 [ id "game-header" ] [ Html.text "Magnet Melee!!!" ]
+        [ h1 [ id "game-header" ]
+            [ Html.text "Magnet Melee!!!" ]
+        , div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game.turn ]
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game
             , div [ id "game-scores-over", class "game-score-over-container" ]

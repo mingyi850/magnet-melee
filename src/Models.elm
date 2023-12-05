@@ -1,5 +1,6 @@
 module Models exposing (..)
 
+import Array
 import CellGrid exposing (..)
 import Color exposing (..)
 import Common exposing (Player)
@@ -302,14 +303,14 @@ pieceMagneticField magnetism distanceVector piece currentCoordinate remainingMag
 
 pieceMagneticFieldDirs : Float -> List FloatVector
 pieceMagneticFieldDirs magnitude =
-    [ { x = 1, y = 0 }
-    , { x = 0, y = 1 }
-    , { x = -1, y = 0 }
-    , { x = 0, y = -1 }
-    , { x = 1, y = 1 }
-    , { x = -1, y = 1 }
-    , { x = -1, y = -1 }
-    , { x = 1, y = -1 }
+    [ { x = magnitude, y = 0 }
+    , { x = 0, y = magnitude }
+    , { x = -magnitude, y = 0 }
+    , { x = 0, y = -magnitude }
+    , { x = magnitude, y = magnitude }
+    , { x = -magnitude, y = magnitude }
+    , { x = -magnitude, y = -magnitude }
+    , { x = magnitude, y = -magnitude }
     ]
 
 
@@ -329,7 +330,7 @@ getMagneticFieldFromPiece board magnetism pieceCoordinate =
     in
     case finalPiece of
         Just p ->
-            List.concatMap (\vector -> pieceMagneticField magnetism vector p pieceCoordinate magnetism) (pieceMagneticFieldDirs (toFloat magnetism))
+            List.concatMap (\vector -> pieceMagneticField magnetism vector p pieceCoordinate magnetism) (pieceMagneticFieldDirs 1)
 
         Nothing ->
             []
@@ -533,6 +534,11 @@ movePieceUnsafe board pieceIndex vector =
             board
 
 
+coordinateOnMap : Coordinate -> Board -> Bool
+coordinateOnMap coordinate board =
+    coordinate.x >= 0 && coordinate.x < board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < board.config.gridDimensions
+
+
 movePiece : Board -> Int -> IntVector -> Board
 movePiece board pieceIndex vector =
     let
@@ -546,7 +552,7 @@ movePiece board pieceIndex vector =
                     getMaxMovementCoordinate pieceIndex board coordinate vector
 
                 newCoordinateOnMap =
-                    newCoordinate.x >= 0 && newCoordinate.x < board.config.gridDimensions && newCoordinate.y >= 0 && newCoordinate.y < board.config.gridDimensions
+                    coordinateOnMap newCoordinate board
             in
             if newCoordinateOnMap then
                 { board
@@ -594,6 +600,96 @@ getBoardScores board =
 
 
 {-------------------------------------------------
+   AI Specific Functions 
+--------------------------------------------------}
+
+
+type alias AIMove =
+    { x : Int
+    , y : Int
+    , polarity : Polarity
+    }
+
+
+getDominantPolarity : Board -> Polarity
+getDominantPolarity board =
+    let
+        polaritySway =
+            board.pieces
+                |> Dict.values
+                |> List.map (\piece -> piece.polarity)
+                |> List.foldl
+                    (\polarity accum ->
+                        if polarity == Positive then
+                            accum + 1
+
+                        else
+                            accum - 1
+                    )
+                    0
+    in
+    if polaritySway > 0 then
+        Positive
+
+    else
+        Negative
+
+
+getMoveNearCoordinate : Coordinate -> Board -> List FloatVector -> Int -> Coordinate
+getMoveNearCoordinate coordinate board vectors magnitude =
+    case vectors of
+        [] ->
+            getMoveNearCoordinate coordinate board (pieceMagneticFieldDirs (toFloat magnitude)) (magnitude + 1)
+
+        vector :: rest ->
+            let
+                tentativeNext =
+                    movePieceCoordinate coordinate (scaledUnit magnitude vector)
+
+                tentativeNextPiece =
+                    getPieceFromCoordinate board tentativeNext
+            in
+            case tentativeNextPiece of
+                Just _ ->
+                    getMoveNearCoordinate tentativeNext board rest magnitude
+
+                Nothing ->
+                    tentativeNext
+
+
+getAIMoveEasy : Board -> AIMove
+getAIMoveEasy board =
+    let
+        dominantPolarity =
+            getDominantPolarity board
+
+        piecePolarity =
+            if dominantPolarity == Positive then
+                Negative
+
+            else
+                Positive
+
+        currentCoordinates =
+            Array.fromList (Dict.values board.pieceCoordinates)
+
+        currentCoordinatesMiddle =
+            Array.length currentCoordinates // 3
+
+        middleCoordinate =
+            Maybe.withDefault { x = board.config.gridDimensions // 2, y = board.config.gridDimensions // 2 } (Array.get currentCoordinatesMiddle currentCoordinates)
+
+        coordinates =
+            getMoveNearCoordinate middleCoordinate board (pieceMagneticFieldDirs 1) 2
+    in
+    { x = coordinates.x, y = coordinates.y, polarity = piecePolarity }
+
+
+
+{-
+   Cell Grid Specific View Functions
+-}
+{-------------------------------------------------
    View Helper Functions
 -------------------------------------------------}
 
@@ -638,12 +734,6 @@ determineCellContent magneticField board coordinate =
                             NoContent
 
 
-
-{-
-   Cell Grid Specific View Functions
--}
-
-
 getCellGrid : Board -> CellGrid CellContent
 getCellGrid board =
     CellGrid.initialize (Dimensions board.config.gridDimensions board.config.gridDimensions) (\i j -> determineCellContent board.magneticField board (fromArgs j i))
@@ -658,10 +748,10 @@ getCellColorFromContent : CellContent -> Color.Color
 getCellColorFromContent content =
     case content of
         GridPiece piece ->
-            Color.white
+            Color.darkGrey
 
         NoContent ->
-            Color.white
+            Color.darkGrey
 
         GridMagneticField field ->
             List.map (\player -> getPlayerColor player) field.players

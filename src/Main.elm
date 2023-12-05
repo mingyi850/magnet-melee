@@ -145,7 +145,13 @@ TODO: modify this function to include your own intro text.
 introText : Html Msg
 introText =
     div [ class "intro-text" ]
-        [ p [] [ text "This is the blank game template. Fill this part in with your own intro text." ] ]
+        [ p [] [ text "Magnet Melee! Control as much space on the board as possible using your magnetic powers." ]
+        , p [] [ text "Rule 1: Magnets of similar polarities repel each other while magnets of opposing polarity attract each other" ]
+        , p [] [ text "Rule 2: Magnets exert magnetic fields in only 8 directions" ]
+        , p [] [ text "Rule 3: The more space you control via your magnetic field, the more points you get" ]
+        , p [] [ text "Rule 4: Knock opponents magnets off the field to secure victory!" ]
+        , p [] [ text " The game ends when you run out of moves" ]
+        ]
 
 
 {-| The view function for the application. This function mostly just routes the view

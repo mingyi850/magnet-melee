@@ -296,6 +296,8 @@ button#restart-button:active {
 
 .player-number {
   flex-shrink: 0;
+  justify-content: left;
+  align-items: left;
 }
 
 .player-number-container {
@@ -308,7 +310,7 @@ button#restart-button:active {
 
 
 .player-color-indicator {
-  width: 50%;
+  width: 50px;
   border-radius: 0%;
   margin: 0px;
 }
@@ -389,4 +391,31 @@ button#restart-button:active {
 
 #polarity-picker-label {
   font-size: 1rem;
+}
+
+#turn-text {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0px;
+  margin-top: 0px;
+}
+
+#turn-display {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: left;
+}
+
+#turn-display>div {
+  flex: 1;
+  justify-content: left;
+  font-size: 1rem;
+  flex-wrap: nowrap;
+  align-items: left;
+  margin: 10px;
+}
+
+.player-number-container>* {
+  margin-right: 0px;
 }
