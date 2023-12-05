@@ -277,19 +277,71 @@ button#restart-button:active {
 .grid-container {
   display: flex;
   flex-direction: row;
+  align-items: stretch;
+}
+
+.game-board {
+  align-self: start;
+}
+
+.game-board>div {
+  flex-basis: calc(50% - 10px);
+}
+
+.game-score-over-container {
+  position: relative;
+  min-width: 300px;
+  flex-shrink: 2;
+}
+
+.player-number {
+  flex-shrink: 0;
 }
 
 .player-number-container {
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.player-display-container {
+
+.player-color-indicator {
+  width: 50%;
+  border-radius: 0%;
+  margin: 0px;
+}
+
+.player-number-row {
+  display: flex;
+  place-items: row;
+  width: 100%;
+  margin: -10%;
+}
+
+.game-over-container {
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
+  justify-content: center;
   align-items: center;
-  margin-left: 50px;
+  margin: 5%;
+}
+
+.game-over-header-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin: 5%;
+}
+
+.game-over-scores-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin: 10%;
 }
 
 .player-color {
@@ -298,6 +350,43 @@ button#restart-button:active {
   align-items: center;
 }
 
-.player-container>div {
-  margin: -10px;
+.player-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-wrap: nowrap;
+  justify-content: center;
+  margin-left: 0px;
+  gap: 0px;
+}
+
+.player-score-container {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  margin: 0%;
+}
+
+.player-score-container>div {
+  margin-top: -2%;
+  margin-bottom: -2%;
+}
+
+.player-moves-container {
+  font-size: 1.2rem;
+}
+
+.player-score-box {
+  font-size: 1.5rem;
+}
+
+#polarity-label {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+#polarity-picker-label {
+  font-size: 1rem;
 }

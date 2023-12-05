@@ -116,7 +116,7 @@ type Move
     = Increment
     | Decrement
     | Multiply
-    | SelectPolarity Polarity
+    | SelectPolarity Int Polarity
     | PlacePiece Coordinate
     | DisplayPiece Coordinate
 
@@ -140,8 +140,8 @@ applyMove move game =
         Multiply ->
             { status = Success, game = { game | gridSize = game.gridSize * 2, magnetism = game.magnetism + 1 } }
 
-        SelectPolarity polarity ->
-            { status = Success, game = { game | playerPolarity = polarity } }
+        SelectPolarity player polarity ->
+            { status = Success, game = updatePlayerPolarity player polarity game }
 
         PlacePiece coordinate ->
             case getPieceFromCoordinate game.board coordinate of
@@ -154,7 +154,7 @@ applyMove move game =
                         { game
                             | board =
                                 removeTentativePieces game.board
-                                    |> insertPiece { player = game.turn, polarity = game.playerPolarity } coordinate
+                                    |> insertPiece { player = game.turn, polarity = getPlayerPolarity game.turn game } coordinate
                         }
                     }
 
@@ -164,7 +164,7 @@ applyMove move game =
                     { status = Failure, game = game }
 
                 Nothing ->
-                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = game.playerPolarity } coordinate game.board |> updateBoardMagneticField game.magnetism } }
+                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = getPlayerPolarity game.turn game } coordinate game.board |> updateBoardMagneticField game.magnetism } }
 
 
 getGameScore : Game -> Dict Int Float
@@ -177,6 +177,11 @@ getGameScore game =
             getBoardScores game.board
     in
     addDicts scores boardScores
+
+
+getPlayerPolarity : Int -> Game -> Polarity
+getPlayerPolarity player game =
+    Maybe.withDefault Negative (Maybe.map (\playerData -> playerData.polarity) (Dict.get player game.players))
 
 
 
@@ -201,8 +206,8 @@ type Msg
     | ClickedDecrement
     | ClickedMultiply
     | ModelMsg Models.Msg
-    | SelectedPolarity Polarity
     | UpdateBoard Int (List Board)
+    | UpdatePlayerPolarity Int Polarity
 
 
 {-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
@@ -292,6 +297,14 @@ updateGameBoard magnitude game =
         { status = Success, game = newGame }
 
 
+updatePlayerPolarity : Int -> Polarity -> Game -> Game
+updatePlayerPolarity player polarity game =
+    { game
+        | players =
+            Dict.update player (Maybe.map (\playerData -> { playerData | polarity = polarity })) game.players
+    }
+
+
 checkGameOver : Game -> Game
 checkGameOver game =
     -- Check if all remaining moves for all players is 0 or less
@@ -327,9 +340,9 @@ update msg game =
         ClickedMultiply ->
             withCmd Cmd.none (applyMove Multiply game)
 
-        SelectedPolarity polarity ->
+        UpdatePlayerPolarity player polarity ->
             game
-                |> applyMove (SelectPolarity polarity)
+                |> applyMove (SelectPolarity player polarity)
                 |> withCmd Cmd.none
 
         ModelMsg modelMsg ->
@@ -377,7 +390,7 @@ can be sent from.
 -}
 getBoardConfig : Settings -> BoardConfig
 getBoardConfig settings =
-    { displaySize = Basics.max 800 settings.gridSize
+    { displaySize = Basics.max 600 settings.gridSize
     , gridDimensions = settings.gridSize
     }
 
@@ -385,87 +398,142 @@ getBoardConfig settings =
 getBoardView : Game -> Html Msg
 getBoardView game =
     Html.map ModelMsg
-        (div [ id "board-container" ]
+        (div [ id "board-container", class "game-board" ]
             [ boardHtml game.board ]
         )
 
 
-type alias GameDropdownGenericConfig enum =
+type alias GamePickChoiceOptionButton =
     { label : String
-    , onSelect : enum -> Msg
-    , toString : enum -> String
-    , fromString : String -> enum
-    , current : enum
-    , options : List ( String, enum )
+    , onSelect : Msg
+    , isSelected : Bool
     }
 
 
-polarityDropDownConfig : Game -> GameDropdownGenericConfig Polarity
-polarityDropDownConfig game =
+type alias GamePickChoiceButtonsConfig =
+    { label : String
+    , options : List GamePickChoiceOptionButton
+    }
+
+
+polarityPickChoiceConfig : Int -> Game -> GamePickChoiceButtonsConfig
+polarityPickChoiceConfig player game =
     { label = "Player Polarity"
-    , onSelect = \polarity -> SelectedPolarity polarity
-    , toString = \polarity -> toPolarityString polarity
-    , fromString = \polarityString -> fromPolarityString polarityString
-    , current = game.playerPolarity
-    , options = [ ( "Positive", Positive ), ( "Negative", Negative ), ( "None", None ) ]
+    , options =
+        [ { label = "+", onSelect = UpdatePlayerPolarity player Positive, isSelected = getPlayerPolarity player game == Positive }
+        , { label = "-", onSelect = UpdatePlayerPolarity player Negative, isSelected = getPlayerPolarity player game == Negative }
+        ]
     }
 
 
-type alias GamePickChoiceDropdownConfig =
-    { label : String
-    , onSelect : String -> Msg
-    , options : List PickChoiceDropdownOption
-    }
-
-
-genericConfigToDropdownConfig : GameDropdownGenericConfig enum -> GamePickChoiceDropdownConfig
-genericConfigToDropdownConfig { label, onSelect, toString, fromString, current, options } =
-    { label = label
-    , onSelect = fromString >> onSelect
-    , options = List.map (\( optionLabel, value ) -> { label = optionLabel, value = toString value, isSelected = value == current }) options
-    }
-
-
-viewPolarityDropdown : GamePickChoiceDropdownConfig -> Html Msg
-viewPolarityDropdown config =
+viewPolaritySelector : GamePickChoiceButtonsConfig -> Html Msg
+viewPolaritySelector data =
     div [ class "setting-picker-item" ]
-        [ label [ class "setting-picker-item-label" ] [ Html.text config.label ]
-        , select [ class "setting-picker-item-input setting-picker-item-input-select", onInput config.onSelect ]
+        [ label [ id "polarity-picker-label", class "setting-picker-item-label" ] [ Html.text data.label ]
+        , div [ class "setting-picker-item-input setting-picker-item-input-buttons" ]
             (List.map
-                (\optionData ->
-                    option [ value optionData.value, selected optionData.isSelected ] [ Html.text optionData.label ]
+                (\{ label, onSelect, isSelected } ->
+                    button
+                        [ id "polarity-label"
+                        , class ("setting-picker-item-button setting-picker-item-button-" ++ String.replace " " "-" label)
+                        , classList [ ( "selected", isSelected ) ]
+                        , onClick onSelect
+                        ]
+                        [ Html.text label ]
                 )
-                config.options
+                data.options
             )
         ]
 
 
-getPolarityDropdown : Game -> Html Msg
-getPolarityDropdown game =
-    let
-        config =
-            genericConfigToDropdownConfig (polarityDropDownConfig game)
-    in
-    viewPolarityDropdown config
-
-
 getPlayerContainers : Game -> List (Html Msg)
 getPlayerContainers game =
-    Dict.values (Dict.map (\index playerData -> playerContainer index playerData) game.players)
+    Dict.values (Dict.map (\index playerData -> playerContainer index playerData game) game.players)
 
 
-playerContainer : Int -> Player -> Html Msg
-playerContainer playerNum player =
-    div [ class "player-container" ]
-        [ div [ class "player-number-container" ]
-            [ h1 [ id "player-num" ]
-                [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]
-            , div [ id "player-color-indicator", class "player-color" ] [ Svg.svg [] [ Svg.circle [ Svg.Attributes.cx "20%", Svg.Attributes.cy "50%", Svg.Attributes.r "5%", Svg.Attributes.fill (toCssString (playerColorToColor (getPlayerColor playerNum))) ] [] ] ]
+getPlayerScoreContainers : Game -> List (Html Msg)
+getPlayerScoreContainers game =
+    Dict.values (Dict.map (\index playerData -> playerScoreContainer index playerData) game.players)
+
+
+getGameWinner : Game -> Int
+getGameWinner game =
+    let
+        playerScores =
+            getGameScore game
+    in
+    Dict.foldl
+        (\player score ( aPlayer, aScore ) ->
+            if score > aScore then
+                ( player, score )
+
+            else
+                ( aPlayer, aScore )
+        )
+        ( -1, -1 )
+        playerScores
+        |> Tuple.first
+
+
+getGameOverContainer : Game -> Html Msg
+getGameOverContainer game =
+    if game.status == GameOver then
+        div [ id "game-over", class "game-over-container" ]
+            [ div [ id "game-over-headers", class "game-over-header-container" ]
+                [ h1 [ id "game-over-header" ] [ Html.text "Game Over!" ]
+                , h1 [ id "game-over-subheader" ] [ Html.text "Winner: " ]
+                , div [ id "player-numbers-row", class "player-number-row" ] [ playerNumContainer (getGameWinner game) ]
+                ]
+            , div [ id "game-over-scores", class "game-over-scores-container" ]
+                [ h1 [ id "game-over-subheader" ] [ Html.text "Scores: " ]
+                , div [ id "player-score-container", class "player-score-container" ] (getPlayerScoreContainers game)
+                ]
             ]
-        , div [ class "player-moves-container" ] [ h2 [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
-        , div [ class "player-polarity-container" ] [ h2 [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
+
+    else
+        div [] []
+
+
+playerNumContainer : Int -> Html Msg
+playerNumContainer playerNum =
+    div [ id "num-container", class "player-number-container" ]
+        [ div [ id "player-color", class "player-color-indicator" ]
+            [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width "40px", Svg.Attributes.height "40px" ]
+                [ Svg.circle [ Svg.Attributes.cx "50%", Svg.Attributes.cy "50%", Svg.Attributes.r "50%", Svg.Attributes.fill (toCssString (playerColorToColor (getPlayerColor playerNum))) ] [] ]
+            ]
+        , h1 [ id "player-num", class "player-number" ]
+            [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]
+        ]
+
+
+playerScoreContainer : Int -> Player -> Html Msg
+playerScoreContainer playerNum player =
+    div [ id "player-score", class "player-score-container" ]
+        [ playerNumContainer playerNum
         , div [ class "player-score-container" ]
             [ h2 [ id "score-box" ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
+        ]
+
+
+getPlayersOrGameOverContainer : Game -> Html Msg
+getPlayersOrGameOverContainer game =
+    if game.status == GameOver then
+        getGameOverContainer game
+
+    else
+        div [ id "game-score-container", class "player-display-container" ] (getPlayerContainers game)
+
+
+playerContainer : Int -> Player -> Game -> Html Msg
+playerContainer playerNum player game =
+    div [ id "player-info", class "player-container" ]
+        [ playerNumContainer playerNum
+        , div [ class "player-moves-container" ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
+        , viewPolaritySelector (polarityPickChoiceConfig playerNum game)
+
+        --, div [ class "player-polarity-container" ] [ div [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
+        , div [ class "player-score-box" ]
+            [ div [ id "score-box" ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
         ]
 
 
@@ -473,12 +541,10 @@ view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
         [ h1 [ id "game-header" ] [ Html.text "Magnet Melee!!!" ]
-        , h2 [ id "total-moves-value" ] [ Html.text ("Total Moves: " ++ String.fromInt game.totalMoves) ]
-        , div [ id "polarity-dropdown", class "grid-container" ]
-            [ getPolarityDropdown game ]
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game
-            , div [ id "game-score-container", class "player-display-container" ]
-                (getPlayerContainers game)
+            , div [ id "game-scores-over", class "game-score-over-container" ]
+                [ getPlayersOrGameOverContainer game
+                ]
             ]
         ]

@@ -73,6 +73,8 @@ setting). This is typically the same type as your setting.
 type Msg
     = SetGridSize Int
     | SetMagnetism Int
+    | SetNumMoves Int
+    | SetNumPlayers Int
 
 
 {-| STEP 4: Define explicitly what happens to your settings when a message is received.
@@ -89,6 +91,12 @@ update msg settings =
 
         SetMagnetism magnetism ->
             { settings | magnetism = magnetism }
+
+        SetNumMoves moves ->
+            { settings | maxMoves = moves }
+
+        SetNumPlayers players ->
+            { settings | players = players }
 
 
 {-| STEP 5: Define a list of pickers for each setting you want to be able to change.
@@ -126,6 +134,20 @@ pickers settings =
         , min = 2
         , max = 30
         , onChange = SetMagnetism
+        }
+    , inputIntRange
+        { label = "Number of Moves"
+        , value = settings.maxMoves
+        , min = 1
+        , max = 30
+        , onChange = SetNumMoves
+        }
+    , inputIntRange
+        { label = "Number of Players"
+        , value = settings.players
+        , min = 1
+        , max = 4
+        , onChange = SetNumPlayers
         }
     ]
 
@@ -356,8 +378,8 @@ current settings in this function (as Settings) so can use that
 information to make decisions on what to render as well.
 
 -}
-viewPickerItem : Settings -> SettingPickerItem -> Html Msg
-viewPickerItem settings item =
+viewPickerItem : SettingPickerItem -> Html Msg
+viewPickerItem item =
     case item of
         InputString data ->
             div [ class "setting-picker-item" ]
@@ -460,10 +482,10 @@ viewPickerItem settings item =
 
 {-| View just the picker part of the settings
 -}
-viewPicker : Settings -> List SettingPickerItem -> Html Msg
-viewPicker settings items =
+viewPicker : List SettingPickerItem -> Html Msg
+viewPicker items =
     div [ id "settings-picker" ]
-        (List.map (viewPickerItem settings) items)
+        (List.map viewPickerItem items)
 
 
 {-| The function that views all settings which gets called from the Main application.
@@ -471,5 +493,5 @@ viewPicker settings items =
 view : Settings -> Html Msg
 view settings =
     div [ id "settings" ]
-        [ viewPicker settings (pickers settings)
+        [ viewPicker (pickers settings)
         ]
