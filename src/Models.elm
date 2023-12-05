@@ -616,9 +616,12 @@ movePieceCoordinate coordinate vector =
     { x = coordinate.x + vector.x, y = coordinate.y + vector.y }
 
 
-getMaxMovementCoordinate : Board -> Coordinate -> IntVector -> Coordinate
-getMaxMovementCoordinate board coordinate vector =
+getMaxMovementCoordinate : Int -> Board -> Coordinate -> IntVector -> Coordinate
+getMaxMovementCoordinate pieceIndex board coordinate vector =
     let
+        unitVector =
+            unitIntVector vector
+
         tentativeNext =
             movePieceCoordinate coordinate (unitIntVector vector)
 
@@ -630,11 +633,29 @@ getMaxMovementCoordinate board coordinate vector =
             coordinate
 
         Nothing ->
-            coordinate
+            getMaxMovementCoordinate pieceIndex (movePieceUnsafe board pieceIndex unitVector) tentativeNext (decreaseIntVectorMagnitude vector)
 
 
+movePieceUnsafe : Board -> Int -> IntVector -> Board
+movePieceUnsafe board pieceIndex vector =
+    let
+        pieceCoordinate =
+            Dict.get pieceIndex board.pieceCoordinates
+    in
+    case pieceCoordinate of
+        Just coordinate ->
+            let
+                newPieceCoordinate =
+                    movePieceCoordinate vector coordinate
+            in
+            { board
+                | pieceCoordinates = Dict.insert pieceIndex newPieceCoordinate board.pieceCoordinates
+                , coordinatePieces =
+                    Dict.insert (toTuple newPieceCoordinate) pieceIndex (Dict.remove (toTuple coordinate) board.coordinatePieces)
+            }
 
---getMaxMovementCoordinate board tentativeNext (decreaseIntVectorMagnitude vector)
+        Nothing ->
+            board
 
 
 movePiece : Board -> Int -> IntVector -> Board
@@ -646,14 +667,11 @@ movePiece board pieceIndex vector =
         newPieceCoordinate =
             Maybe.map (movePieceCoordinate vector) pieceCoordinate
 
-        newPieceCoordinateDir =
-            Maybe.map (movePieceCoordinate (unitIntVector vector)) pieceCoordinate
-
         newPieceCoordinateExisting =
             Maybe.andThen (\coordinate -> Dict.get coordinate board.coordinatePieces) (Maybe.map toTuple newPieceCoordinate)
 
         maxMoveCoordinate =
-            Maybe.map (\coordinate -> getMaxMovementCoordinate board coordinate vector) pieceCoordinate
+            Maybe.map (\coordinate -> getMaxMovementCoordinate pieceIndex board coordinate vector) pieceCoordinate
     in
     case newPieceCoordinateExisting of
         Just _ ->
