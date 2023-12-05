@@ -325,10 +325,10 @@ updateGameBoard magnitude game =
     if newGame == game then
         case game.status of
             Processing ->
-                { status = Failure, game = { newGame | status = getGameStatus game } }
+                { status = Success, game = { newGame | status = getGameStatus game } }
 
             _ ->
-                { status = Failure, game = newGame }
+                { status = Success, game = newGame }
         -- No more changes, stop sending update message
 
     else
@@ -419,12 +419,13 @@ update msg game =
         UpdateBoard magnitude previousStates ->
             if List.member game.board previousStates then
                 updateGameBoard (magnitude + 1) game
-                    |> withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
+                    |> withDetermineUpdateCommand magnitude previousStates
+                -- withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
                 {- ( { game | status = Ready }, Cmd.none ) -}
 
             else
                 updateGameBoard magnitude game
-                    |> withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
+                    |> withDetermineUpdateCommand magnitude previousStates
 
         GetAIMove ->
             case game.status of
@@ -433,9 +434,9 @@ update msg game =
                         aiMove =
                             getAIMove x game
                     in
-                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity ) game
+                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
                         |> updateSuccessfulMove game.turn
-                        |> withCmd (send 100.0 GetAIMove)
+                        |> withCmd (send 200.0 (UpdateBoard 1 []))
 
                 _ ->
                     ( game, Cmd.none )
@@ -452,6 +453,11 @@ getAIMove level game =
 
         _ ->
             getAIMoveEasy game.board
+
+
+withDetermineUpdateCommand : Int -> List Board -> GameMoveResult -> ( Game, Cmd Msg )
+withDetermineUpdateCommand magnitude previousStates gameMoveResult =
+    withCmd (determineUpdateComand magnitude previousStates gameMoveResult) gameMoveResult
 
 
 determineUpdateComand : Int -> List Board -> GameMoveResult -> Cmd Msg
