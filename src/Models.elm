@@ -737,7 +737,7 @@ cellStyle board =
     , cellWidth = toFloat (board.config.displaySize // board.config.gridDimensions)
     , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
     , gridLineColor = Color.rgb 0 0 0
-    , gridLineWidth = 5
+    , gridLineWidth = toFloat (board.config.displaySize // board.config.gridDimensions) / 20
     , shouldRenderPiece =
         \content ->
             case content of
