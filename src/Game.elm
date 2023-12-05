@@ -202,7 +202,7 @@ type Msg
     | ClickedMultiply
     | ModelMsg Models.Msg
     | SelectedPolarity Polarity
-    | UpdateBoard
+    | UpdateBoard Int (List Board)
 
 
 {-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
@@ -267,15 +267,15 @@ updateGameBoardMagneticField game =
     }
 
 
-updateGameBoard : Game -> GameMoveResult
-updateGameBoard game =
+updateGameBoard : Int -> Game -> GameMoveResult
+updateGameBoard magnitude game =
     let
         gameScores =
             getGameScore game
 
         newGame =
             { game
-                | board = updateBoardMagneticField game.magnetism (updatePiecePositions (updateBoardMagneticField game.magnetism game.board))
+                | board = updateBoardMagneticField game.magnetism (updatePiecePositions magnitude (updateBoardMagneticField game.magnetism game.board))
                 , players = updatePlayerScores game.players gameScores
             }
     in
@@ -342,7 +342,7 @@ update msg game =
                                     game
                                         |> applyMove (PlacePiece (determineCellCoordinates cellmsg))
                                         |> updateSuccessfulMove game.turn
-                                        |> withCmd (send 200.0 UpdateBoard)
+                                        |> withCmd (send 200.0 (UpdateBoard 1 []))
 
                                 Hover ->
                                     game
@@ -352,9 +352,13 @@ update msg game =
                         _ ->
                             ( game, Cmd.none )
 
-        UpdateBoard ->
-            updateGameBoard game
-                |> withCmd (send 200.0 UpdateBoard)
+        UpdateBoard magnitude previousStates ->
+            if List.member game.board previousStates then
+                ( { game | status = Ready }, Cmd.none )
+
+            else
+                updateGameBoard magnitude game
+                    |> withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
 
 
 

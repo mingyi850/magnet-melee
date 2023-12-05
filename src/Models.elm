@@ -9,6 +9,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import MyCellGrid exposing (..)
 import Utils exposing (..)
+import VectorUtils exposing (..)
 
 
 
@@ -112,18 +113,6 @@ type CellContent
     | NoContent
     | GridMagneticField MagneticField
     | PieceOnField Piece MagneticField
-
-
-type alias FloatVector =
-    { x : Float
-    , y : Float
-    }
-
-
-type alias IntVector =
-    { x : Int
-    , y : Int
-    }
 
 
 
@@ -235,63 +224,6 @@ toString coordinate =
     "(" ++ String.fromInt coordinate.x ++ "," ++ String.fromInt coordinate.y ++ ")"
 
 
-negative : FloatVector -> FloatVector
-negative vector =
-    { x = -vector.x, y = -vector.y }
-
-
-unit : FloatVector -> IntVector
-unit vector =
-    let
-        x =
-            if vector.x == 0 then
-                0
-
-            else if vector.x > 0 then
-                1
-
-            else
-                -1
-
-        y =
-            if vector.y == 0 then
-                0
-
-            else if vector.y > 0 then
-                1
-
-            else
-                -1
-    in
-    { x = x, y = y }
-
-
-unitIntVector : IntVector -> IntVector
-unitIntVector vector =
-    let
-        x =
-            if vector.x == 0 then
-                0
-
-            else if vector.x > 0 then
-                1
-
-            else
-                -1
-
-        y =
-            if vector.y == 0 then
-                0
-
-            else if vector.y > 0 then
-                1
-
-            else
-                -1
-    in
-    { x = x, y = y }
-
-
 emptyBoard : BoardConfig -> Board
 emptyBoard boardConfig =
     { pieces = Dict.empty
@@ -323,63 +255,6 @@ getTentativePieceFromCoordinate board coordinate =
                 |> Dict.get (toTuple coordinate)
     in
     Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
-
-
-combineVectors : FloatVector -> FloatVector -> FloatVector
-combineVectors vector1 vector2 =
-    { x = vector1.x + vector2.x, y = vector1.y + vector2.y }
-
-
-increaseFloatVectorMagnitude : FloatVector -> FloatVector
-increaseFloatVectorMagnitude vector =
-    let
-        newX =
-            if vector.x == 0 then
-                0
-
-            else if vector.x > 0 then
-                vector.x + 1
-
-            else
-                vector.x - 1
-
-        newY =
-            if vector.y == 0 then
-                0
-
-            else if vector.y > 0 then
-                vector.y + 1
-
-            else
-                vector.y - 1
-    in
-    { x = newX, y = newY }
-
-
-decreaseIntVectorMagnitude : IntVector -> IntVector
-decreaseIntVectorMagnitude vector =
-    let
-        newX =
-            if vector.x == 0 then
-                0
-
-            else if vector.x > 0 then
-                vector.x - 1
-
-            else
-                vector.x + 1
-
-        newY =
-            if vector.y == 0 then
-                0
-
-            else if vector.y > 0 then
-                vector.y - 1
-
-            else
-                vector.y + 1
-    in
-    { x = newX, y = newY }
 
 
 
@@ -517,17 +392,17 @@ updateBoardMagneticField magnetism board =
     }
 
 
-updatePiecePositions : Board -> Board
-updatePiecePositions board =
+updatePiecePositions : Int -> Board -> Board
+updatePiecePositions magnitude board =
     let
         coordinatePieces =
             Dict.values (Dict.map (\coordinate index -> ( coordinate, index, Dict.get index board.pieces )) board.coordinatePieces)
     in
-    updatePiecePositionsRecursive coordinatePieces board.magneticField board
+    updatePiecePositionsRecursive magnitude coordinatePieces board.magneticField board
 
 
-updatePiecePositionsRecursive : List ( ( Int, Int ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
-updatePiecePositionsRecursive coordinatePieces magneticFields board =
+updatePiecePositionsRecursive : Int -> List ( ( Int, Int ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
+updatePiecePositionsRecursive magnitude coordinatePieces magneticFields board =
     case coordinatePieces of
         [] ->
             board
@@ -546,15 +421,15 @@ updatePiecePositionsRecursive coordinatePieces magneticFields board =
                         Just f ->
                             let
                                 movementVector =
-                                    unit (getMovementVectorForMagnet f p)
+                                    scaledUnit magnitude (getMovementVectorForMagnet f p)
                             in
-                            updatePiecePositionsRecursive rest magneticFields (movePiece board pieceIndex movementVector)
+                            updatePiecePositionsRecursive magnitude rest magneticFields (movePiece board pieceIndex movementVector)
 
                         Nothing ->
-                            updatePiecePositionsRecursive rest magneticFields board
+                            updatePiecePositionsRecursive magnitude rest magneticFields board
 
                 Nothing ->
-                    updatePiecePositionsRecursive rest magneticFields board
+                    updatePiecePositionsRecursive magnitude rest magneticFields board
 
 
 getMovementVectorForMagnet : MagneticField -> Piece -> FloatVector
@@ -663,46 +538,32 @@ movePiece board pieceIndex vector =
     let
         pieceCoordinate =
             Dict.get pieceIndex board.pieceCoordinates
-
-        newPieceCoordinate =
-            Maybe.map (movePieceCoordinate vector) pieceCoordinate
-
-        newPieceCoordinateExisting =
-            Maybe.andThen (\coordinate -> Dict.get coordinate board.coordinatePieces) (Maybe.map toTuple newPieceCoordinate)
-
-        maxMoveCoordinate =
-            Maybe.map (\coordinate -> getMaxMovementCoordinate pieceIndex board coordinate vector) pieceCoordinate
     in
-    case newPieceCoordinateExisting of
-        Just _ ->
-            board
+    case pieceCoordinate of
+        Just coordinate ->
+            let
+                newCoordinate =
+                    getMaxMovementCoordinate pieceIndex board coordinate vector
+
+                newCoordinateOnMap =
+                    newCoordinate.x >= 0 && newCoordinate.x < board.config.gridDimensions && newCoordinate.y >= 0 && newCoordinate.y < board.config.gridDimensions
+            in
+            if newCoordinateOnMap then
+                { board
+                    | pieceCoordinates = Dict.insert pieceIndex newCoordinate board.pieceCoordinates
+                    , coordinatePieces =
+                        Dict.insert (toTuple newCoordinate) pieceIndex (Dict.remove (toTuple coordinate) board.coordinatePieces)
+                }
+
+            else
+                { board
+                    | pieceCoordinates = Dict.remove pieceIndex board.pieceCoordinates
+                    , coordinatePieces =
+                        Dict.remove (toTuple coordinate) board.coordinatePieces
+                }
 
         Nothing ->
-            case pieceCoordinate of
-                Just coordinate ->
-                    let
-                        newCoordinate =
-                            movePieceCoordinate vector coordinate
-
-                        newCoordinateOnMap =
-                            newCoordinate.x >= 0 && newCoordinate.x < board.config.gridDimensions && newCoordinate.y >= 0 && newCoordinate.y < board.config.gridDimensions
-                    in
-                    if newCoordinateOnMap then
-                        { board
-                            | pieceCoordinates = Dict.insert pieceIndex newCoordinate board.pieceCoordinates
-                            , coordinatePieces =
-                                Dict.insert (toTuple newCoordinate) pieceIndex (Dict.remove (toTuple coordinate) board.coordinatePieces)
-                        }
-
-                    else
-                        { board
-                            | pieceCoordinates = Dict.remove pieceIndex board.pieceCoordinates
-                            , coordinatePieces =
-                                Dict.remove (toTuple coordinate) board.coordinatePieces
-                        }
-
-                Nothing ->
-                    board
+            board
 
 
 
