@@ -83,7 +83,7 @@ type alias RandomMove =
 type Agent
     = Human
     | AIEasy
-    | AIMedium
+    | AIHard
 
 
 getAgentFromInt : Int -> Agent
@@ -96,7 +96,7 @@ getAgentFromInt agent =
             AIEasy
 
         2 ->
-            AIMedium
+            AIHard
 
         _ ->
             Human
@@ -151,7 +151,7 @@ getInitGameStatus settings =
         AIEasy ->
             AI 0
 
-        AIMedium ->
+        AIHard ->
             AI 1
 
 
@@ -392,7 +392,7 @@ getGameStatus game =
             AIEasy ->
                 AI 0
 
-            AIMedium ->
+            AIHard ->
                 AI 1
 
 

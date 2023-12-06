@@ -169,7 +169,7 @@ aiPickers settings =
                 { label = "Player " ++ String.fromInt (player + 1)
                 , onSelect = SetPlayerAi player
                 , current = Maybe.withDefault 0 (Array.get player settings.playerAI)
-                , options = [ ( "Human", 0 ), ( "Easy", 1 ), ( "Medium", 2 ) ]
+                , options = [ ( "Human", 0 ), ( "Easy", 1 ), ( "Hard", 2 ) ]
                 }
         )
         (List.range 0 (settings.players - 1))
