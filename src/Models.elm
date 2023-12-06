@@ -694,6 +694,20 @@ getAIMoveEasy board =
     { x = coordinates.x, y = coordinates.y, polarity = piecePolarity }
 
 
+getFreeCoordinates : Board -> List Coordinate
+getFreeCoordinates board =
+    let
+        currentTaken =
+            Dict.values board.pieceCoordinates
+
+        allCoordinates =
+            List.range 0 (board.config.gridDimensions - 1)
+                |> List.map (\x -> List.range 0 (board.config.gridDimensions - 1) |> List.map (\y -> { x = x, y = y }))
+                |> List.concat
+    in
+    List.filter (\coordinate -> not (List.member coordinate currentTaken)) allCoordinates
+
+
 
 {-
    Cell Grid Specific View Functions

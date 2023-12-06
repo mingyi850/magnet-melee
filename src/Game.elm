@@ -132,12 +132,29 @@ init settings =
             , turn = 0
             , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0, agent = getAgentFromInt (Maybe.withDefault 0 (Array.get player settings.playerAI)) } )) |> Dict.fromList
             , playerPolarity = Negative
-            , status = HumanMove
+            , status = getInitGameStatus settings
             , time = 0
             , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time }
             }
     in
-    ( initialGame, Cmd.none )
+    initialGame |> withDetermineUpdateCommand []
+
+
+getInitGameStatus : Settings -> GameStatus
+getInitGameStatus settings =
+    let
+        firstPlayerAgency =
+            getAgentFromInt (Maybe.withDefault 0 (Array.get 0 settings.playerAI))
+    in
+    case firstPlayerAgency of
+        Human ->
+            HumanMove
+
+        AIEasy ->
+            AI 0
+
+        AIMedium ->
+            AI 1
 
 
 
@@ -227,6 +244,18 @@ getGameScore game =
     addDicts scores boardScores
 
 
+getAvgScoreMargin : Int -> Game -> Float
+getAvgScoreMargin player game =
+    let
+        scores =
+            getGameScore game
+
+        playerScore =
+            Dict.get player scores |> Maybe.withDefault 0.0
+    in
+    Dict.values scores |> List.map (\otherScore -> playerScore - otherScore) |> List.foldl (+) 0.0 |> (\x -> x / toFloat (Dict.size scores - 1))
+
+
 getPlayerPolarity : Int -> Game -> Polarity
 getPlayerPolarity player game =
     Maybe.withDefault Negative (Maybe.map (\playerData -> playerData.polarity) (Dict.get player game.players))
@@ -256,9 +285,9 @@ getPlayerAgency player game =
 -}
 type Msg
     = ModelMsg Models.Msg
-    | GetAIMove
+    | GenerateAIMove
     | PlayAIMove
-    | UpdateBoard Int (List Board)
+    | UpdateBoard (List Board)
     | UpdatePlayerPolarity Int Polarity
 
 
@@ -290,7 +319,7 @@ progressGameSuccess player game =
         , status = Processing
     }
         |> checkGameOver
-        |> withCmd (send 200.0 (UpdateBoard 1 []))
+        |> withCmd (send 200.0 (UpdateBoard []))
 
 
 processMoveResult : Int -> (Int -> Game -> ( Game, Cmd Msg )) -> (Int -> Game -> ( Game, Cmd Msg )) -> GameMoveResult -> ( Game, Cmd Msg )
@@ -364,6 +393,15 @@ updateGameBoard magnitude game =
         newGame
 
 
+simulateGameBoard : Int -> Game -> Game -> Game
+simulateGameBoard steps prevGame currentGame =
+    if steps <= 0 || prevGame == currentGame then
+        currentGame
+
+    else
+        simulateGameBoard (steps - 1) currentGame (updateGameBoard 1 currentGame)
+
+
 getGameStatus : Game -> GameStatus
 getGameStatus game =
     case getPlayerAgency game.turn game of
@@ -431,16 +469,15 @@ update msg game =
                         _ ->
                             ( game, Cmd.none )
 
-        UpdateBoard magnitude previousStates ->
-            if List.member game.board previousStates then
-                updateGameBoard (magnitude + 1) game
-                    |> withDetermineUpdateCommand magnitude previousStates
+        UpdateBoard previousStates ->
+            let
+                previousStatesCount =
+                    List.length (List.filter (\board -> board == game.board) previousStates)
+            in
+            updateGameBoard (previousStatesCount + 1) game
+                |> withDetermineUpdateCommand previousStates
 
-            else
-                updateGameBoard magnitude game
-                    |> withDetermineUpdateCommand magnitude previousStates
-
-        GetAIMove ->
+        GenerateAIMove ->
             case game.status of
                 AI x ->
                     { game | randomMove = generateRandomMove game }
@@ -451,18 +488,10 @@ update msg game =
 
         PlayAIMove ->
             case game.status of
-                AI 0 ->
+                AI x ->
                     let
                         aiMove =
-                            game.randomMove.move
-                    in
-                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
-                        |> processMoveResult game.turn progressGameSuccess sendGetAIMove
-
-                AI 1 ->
-                    let
-                        aiMove =
-                            getAIMove 1 game
+                            getAIMove x game
                     in
                     applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
                         |> processMoveResult game.turn progressGameSuccess sendGetAIMove
@@ -473,7 +502,7 @@ update msg game =
 
 sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
 sendGetAIMove player game =
-    ( game, send 200.0 (UpdateBoard 1 []) )
+    ( game, send 200.0 (UpdateBoard []) )
 
 
 alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
@@ -488,28 +517,62 @@ getAIMove level game =
             game.randomMove.move
 
         1 ->
-            getAIMoveEasy game.board
+            getAIMoveGreedy game.turn game
 
         _ ->
-            getAIMoveEasy game.board
+            getAIMoveGreedy game.turn game
 
 
-withDetermineUpdateCommand : Int -> List Board -> Game -> ( Game, Cmd Msg )
-withDetermineUpdateCommand magnitude previousStates game =
-    withCmd (determineUpdateCommand magnitude previousStates game) game
+getMoveScore : Int -> MoveData -> Game -> Float
+getMoveScore player move game =
+    let
+        newGame =
+            { game | board = insertPiece { player = player, polarity = move.polarity } { x = move.x, y = move.y } game.board }
+
+        simulatedGame =
+            simulateGameBoard 20 game newGame
+    in
+    getAvgScoreMargin player simulatedGame
 
 
-determineUpdateCommand : Int -> List Board -> Game -> Cmd Msg
-determineUpdateCommand magnitude previousStates game =
+getAIMoveGreedy : Int -> Game -> MoveData
+getAIMoveGreedy player game =
+    let
+        freeCoordinates =
+            getFreeCoordinates game.board
+
+        possibleMoves =
+            List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Positive }) freeCoordinates
+                ++ List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Negative }) freeCoordinates
+    in
+    List.map
+        (\move ->
+            { move = move, score = getMoveScore player move game }
+        )
+        possibleMoves
+        |> List.sortBy (\move -> move.score)
+        |> List.reverse
+        |> List.head
+        |> Maybe.map (\move -> move.move)
+        |> Maybe.withDefault { x = game.randomMove.move.x, y = game.randomMove.move.y, polarity = game.randomMove.move.polarity }
+
+
+withDetermineUpdateCommand : List Board -> Game -> ( Game, Cmd Msg )
+withDetermineUpdateCommand previousStates game =
+    withCmd (determineUpdateCommand previousStates game) game
+
+
+determineUpdateCommand : List Board -> Game -> Cmd Msg
+determineUpdateCommand previousStates game =
     case game.status of
         Processing ->
-            send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
+            send 100.0 (UpdateBoard (List.append previousStates [ game.board ]))
 
         AI _ ->
-            send 100.0 GetAIMove
+            send 100.0 GenerateAIMove
 
         GameOver ->
-            send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
+            send 100.0 (UpdateBoard (List.append previousStates [ game.board ]))
 
         _ ->
             Cmd.none
