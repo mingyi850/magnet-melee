@@ -334,15 +334,12 @@ updatePlayerScores players scoreDict =
         players
 
 
-updateGameBoardMagneticField : Game -> GameMoveResult
+updateGameBoardMagneticField : Game -> Game
 updateGameBoardMagneticField game =
-    { status = Success
-    , game =
-        { game | board = updateBoardMagneticField game.magnetism game.board }
-    }
+    { game | board = updateBoardMagneticField game.magnetism game.board }
 
 
-updateGameBoard : Int -> Game -> GameMoveResult
+updateGameBoard : Int -> Game -> Game
 updateGameBoard magnitude game =
     let
         gameScores =
@@ -357,14 +354,14 @@ updateGameBoard magnitude game =
     if newGame == game then
         case game.status of
             Processing ->
-                { status = Success, game = { newGame | status = getGameStatus game } }
+                { newGame | status = getGameStatus game }
 
             _ ->
-                { status = Success, game = newGame }
+                newGame
         -- No more changes, stop sending update message
 
     else
-        { status = Success, game = newGame }
+        newGame
 
 
 getGameStatus : Game -> GameStatus
@@ -497,19 +494,22 @@ getAIMove level game =
             getAIMoveEasy game.board
 
 
-withDetermineUpdateCommand : Int -> List Board -> GameMoveResult -> ( Game, Cmd Msg )
-withDetermineUpdateCommand magnitude previousStates gameMoveResult =
-    withCmd (determineUpdateComand magnitude previousStates gameMoveResult.game) gameMoveResult.game
+withDetermineUpdateCommand : Int -> List Board -> Game -> ( Game, Cmd Msg )
+withDetermineUpdateCommand magnitude previousStates game =
+    withCmd (determineUpdateCommand magnitude previousStates game) game
 
 
-determineUpdateComand : Int -> List Board -> Game -> Cmd Msg
-determineUpdateComand magnitude previousStates game =
+determineUpdateCommand : Int -> List Board -> Game -> Cmd Msg
+determineUpdateCommand magnitude previousStates game =
     case game.status of
         Processing ->
             send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
 
         AI _ ->
             send 100.0 GetAIMove
+
+        GameOver ->
+            send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
 
         _ ->
             Cmd.none
