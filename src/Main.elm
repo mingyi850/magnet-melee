@@ -203,7 +203,7 @@ view screen =
 
 subscriptions : Sub Msg
 subscriptions =
-    Time.every 1000 Tick
+    Time.every 100000 Tick
 
 
 {-| The actual main entrypoint to run the application.

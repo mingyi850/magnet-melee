@@ -64,7 +64,6 @@ type alias Game =
     , players : Dict Int Player
     , playerPolarity : Polarity
     , status : GameStatus
-    , time : Int
     , randomMove : RandomMove
     }
 
@@ -133,11 +132,10 @@ init settings =
             , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0, agent = getAgentFromInt (Maybe.withDefault 0 (Array.get player settings.playerAI)) } )) |> Dict.fromList
             , playerPolarity = Negative
             , status = getInitGameStatus settings
-            , time = 0
             , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time }
             }
     in
-    initialGame |> withDetermineUpdateCommand []
+    initialGame |> (\game -> withDetermineUpdateCommand game [] game)
 
 
 getInitGameStatus : Settings -> GameStatus
@@ -458,7 +456,7 @@ update msg game =
                     List.length (List.filter (\board -> board == game.board) previousStates)
             in
             updateGameBoard (previousStatesCount + 1) game
-                |> withDetermineUpdateCommand previousStates
+                |> withDetermineUpdateCommand game previousStates
 
         GenerateAIMove ->
             case game.status of
@@ -540,16 +538,16 @@ getAIMoveGreedy player game =
         |> Maybe.withDefault { x = game.randomMove.move.x, y = game.randomMove.move.y, polarity = game.randomMove.move.polarity }
 
 
-withDetermineUpdateCommand : List Board -> Game -> ( Game, Cmd Msg )
-withDetermineUpdateCommand previousStates game =
-    withCmd (determineUpdateCommand previousStates game) game
+withDetermineUpdateCommand : Game -> List Board -> Game -> ( Game, Cmd Msg )
+withDetermineUpdateCommand prevGame previousStates game =
+    withCmd (determineUpdateCommand prevGame previousStates game) game
 
 
-determineUpdateCommand : List Board -> Game -> Cmd Msg
-determineUpdateCommand previousStates game =
+determineUpdateCommand : Game -> List Board -> Game -> Cmd Msg
+determineUpdateCommand previousGame previousStates game =
     case game.status of
         Processing ->
-            send 100.0 (UpdateBoard (List.append previousStates [ game.board ]))
+            send 100.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
 
         AI _ ->
             send 100.0 GenerateAIMove
