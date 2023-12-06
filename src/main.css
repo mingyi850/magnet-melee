@@ -241,7 +241,7 @@ button#restart-button:active {
 #game-screen-container {
   display: flex;
   flex-direction: column;
-  background: white;
+  background: whitesmoke;
   min-width: 640px;
   border: 1px solid #64748b;
   padding: 2rem;
@@ -292,6 +292,8 @@ button#restart-button:active {
   position: relative;
   min-width: 300px;
   flex-shrink: 2;
+  background-color: whitesmoke;
+  ;
 }
 
 .player-number {
@@ -405,6 +407,11 @@ button#restart-button:active {
   flex-direction: row;
   align-items: center;
   justify-content: left;
+  height: 50px;
+}
+
+#game-header {
+  font-size: 3rem;
 }
 
 #turn-display>div {

@@ -660,8 +660,7 @@ getGameOverContainer game =
     if game.status == GameOver then
         div [ id "game-over", class "game-over-container" ]
             [ div [ id "game-over-headers", class "game-over-header-container" ]
-                [ h1 [ id "game-over-header" ] [ Html.text "Game Over!" ]
-                , h1 [ id "game-over-subheader" ] [ Html.text "Winner: " ]
+                [ h1 [ id "game-over-subheader" ] [ Html.text "Winner: " ]
                 , div [ id "player-numbers-row", class "player-number-row" ] [ playerNumContainer (getGameWinner game) ]
                 ]
             , div [ id "game-over-scores", class "game-over-scores-container" ]
@@ -717,12 +716,28 @@ playerContainer playerNum player game =
         ]
 
 
+getTurnDisplay : GameStatus -> Game -> Html Msg
+getTurnDisplay status game =
+    case status of
+        HumanMove ->
+            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game.turn ]
+
+        AI _ ->
+            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game.turn ]
+
+        Processing ->
+            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Processing   " ] ]
+
+        GameOver ->
+            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Game Over   " ] ]
+
+
 view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
         [ h1 [ id "game-header" ]
             [ Html.text "Magnet Melee!!!" ]
-        , div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game.turn ]
+        , getTurnDisplay game.status game
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game
             , div [ id "game-scores-over", class "game-score-over-container" ]

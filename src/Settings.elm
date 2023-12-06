@@ -103,7 +103,7 @@ update msg settings =
             { settings | maxMoves = moves }
 
         SetNumPlayers players ->
-            { settings | players = players }
+            { settings | players = players, playerAI = Array.repeat players 0 }
 
         SetPlayerAi player ai ->
             { settings | playerAI = Array.set player ai settings.playerAI }
