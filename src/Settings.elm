@@ -17,6 +17,7 @@ import Common exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Random exposing (..)
 
 
 
@@ -49,6 +50,7 @@ type alias Settings =
     , maxMoves : Int
     , players : Int
     , playerAI : Array Int
+    , time : Int
     }
 
 
@@ -64,6 +66,7 @@ default =
     , maxMoves = 5
     , players = 2
     , playerAI = Array.repeat 2 0
+    , time = 0
     }
 
 
@@ -445,7 +448,7 @@ viewPickerItem item =
                         , value (String.fromFloat data.value)
                         , Html.Attributes.min (String.fromFloat data.min)
                         , Html.Attributes.max (String.fromFloat data.max)
-                        , step (String.fromFloat data.step)
+                        , Html.Attributes.step (String.fromFloat data.step)
                         , onInput (String.toFloat >> Maybe.withDefault 0.0 >> data.onChange)
                         ]
                         []

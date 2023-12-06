@@ -65,12 +65,19 @@ type alias Game =
     , playerPolarity : Polarity
     , status : GameStatus
     , time : Int
+    , randomMove : RandomMove
     }
 
 
 type alias GameMoveResult =
     { status : Status
     , game : Game
+    }
+
+
+type alias RandomMove =
+    { move : MoveData
+    , seed : Seed
     }
 
 
@@ -127,6 +134,7 @@ init settings =
             , playerPolarity = Negative
             , status = HumanMove
             , time = 0
+            , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time }
             }
     in
     ( initialGame, Cmd.none )
@@ -141,10 +149,7 @@ init settings =
 {-| The possible moves that a player can make.
 -}
 type Move
-    = Increment
-    | Decrement
-    | Multiply
-    | SelectPolarity Int Polarity
+    = SelectPolarity Int Polarity
     | PlacePiece Coordinate Polarity
     | DisplayPiece Coordinate Polarity
 
@@ -166,15 +171,6 @@ type alias MoveData =
 applyMove : Move -> Game -> GameMoveResult
 applyMove move game =
     case move of
-        Increment ->
-            { status = Success, game = { game | gridSize = game.gridSize + 1, magnetism = game.magnetism + 1 } }
-
-        Decrement ->
-            { status = Success, game = { game | gridSize = game.gridSize - 1, magnetism = game.magnetism + 1 } }
-
-        Multiply ->
-            { status = Success, game = { game | gridSize = game.gridSize * 2, magnetism = game.magnetism + 1 } }
-
         SelectPolarity player polarity ->
             { status = Success, game = updatePlayerPolarity player polarity game }
 
@@ -202,14 +198,27 @@ applyMove move game =
                     { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } coordinate game.board |> updateBoardMagneticField game.magnetism } }
 
 
-randomGenerator : Random.Generator ( Int, Int )
-randomGenerator =
-    Random.pair (Random.int 0 2) (Random.int 0 2)
+generateRandomMove : Game -> RandomMove
+generateRandomMove game =
+    let
+        randomCoordinate =
+            Random.step (Random.pair (Random.int 0 game.board.config.gridDimensions) (Random.int 0 game.board.config.gridDimensions)) game.randomMove.seed
+                |> (\( ( x, y ), seed ) -> { x = x, y = y, seed = seed })
+
+        randomPolarity =
+            if Tuple.first (Random.step (Random.int 0 1) randomCoordinate.seed) == 0 then
+                Negative
+
+            else
+                Positive
+    in
+    { move = { x = randomCoordinate.x, y = randomCoordinate.y, polarity = randomPolarity }, seed = randomCoordinate.seed }
 
 
-generateRandomNumber : Random.Generator ( Int, Int ) -> Game -> ( ( Int, Int ), Seed )
-generateRandomNumber generator game =
-    Random.step generator (initialSeed game.time)
+generateRandomCoordinate : Game -> Cmd Coordinate
+generateRandomCoordinate game =
+    Random.generate (\( x, y ) -> { x = x, y = y })
+        (Random.pair (Random.int 0 game.board.config.gridDimensions) (Random.int 0 game.board.config.gridDimensions))
 
 
 getGameScore : Game -> Dict Int Float
@@ -252,25 +261,18 @@ getPlayerAgency player game =
 {-| An enumeration of all messages that can be sent from the interface to the game
 -}
 type Msg
-    = ClickedIncrement
-    | ClickedDecrement
-    | ClickedMultiply
-    | ModelMsg Models.Msg
+    = ModelMsg Models.Msg
     | GetAIMove
+    | PlayAIMove
     | UpdateBoard Int (List Board)
     | UpdatePlayerPolarity Int Polarity
 
 
 {-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
 -}
-withCmd : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
-withCmd cmd { status, game } =
-    case status of
-        Success ->
-            ( game, cmd )
-
-        Failure ->
-            ( game, Cmd.none )
+withCmd : Cmd Msg -> Game -> ( Game, Cmd Msg )
+withCmd cmd game =
+    ( game, cmd )
 
 
 
@@ -282,6 +284,29 @@ determineCellCoordinates cellMsg =
     { x = cellMsg.cell.column
     , y = cellMsg.cell.row
     }
+
+
+progressGameSuccess : Int -> Game -> ( Game, Cmd Msg )
+progressGameSuccess player game =
+    { game
+        | players =
+            Dict.update player (Maybe.map (\playerData -> { playerData | remainingMoves = playerData.remainingMoves - 1 })) game.players
+        , totalMoves = game.totalMoves + 1
+        , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
+        , status = Processing
+    }
+        |> checkGameOver
+        |> withCmd (send 200.0 (UpdateBoard 1 []))
+
+
+processMoveResult : Int -> (Int -> Game -> ( Game, Cmd Msg )) -> (Int -> Game -> ( Game, Cmd Msg )) -> GameMoveResult -> ( Game, Cmd Msg )
+processMoveResult player onSuccess onFailure moveResult =
+    case moveResult.status of
+        Success ->
+            onSuccess player moveResult.game
+
+        Failure ->
+            onFailure player moveResult.game
 
 
 updateSuccessfulMove : Int -> GameMoveResult -> GameMoveResult
@@ -391,23 +416,10 @@ a new game state as well as any additional commands to be run.
 update : Msg -> Game -> ( Game, Cmd Msg )
 update msg game =
     case msg of
-        ClickedIncrement ->
-            game
-                |> applyMove Increment
-                |> withCmd Cmd.none
-
-        ClickedDecrement ->
-            game
-                |> applyMove Decrement
-                |> withCmd Cmd.none
-
-        ClickedMultiply ->
-            withCmd Cmd.none (applyMove Multiply game)
-
         UpdatePlayerPolarity player polarity ->
             game
                 |> applyMove (SelectPolarity player polarity)
-                |> withCmd Cmd.none
+                |> alwaysCommand Cmd.none
 
         ModelMsg modelMsg ->
             case modelMsg of
@@ -418,13 +430,12 @@ update msg game =
                                 Click ->
                                     game
                                         |> applyMove (PlacePiece (determineCellCoordinates cellmsg) (getPlayerPolarity game.turn game))
-                                        |> updateSuccessfulMove game.turn
-                                        |> withCmd (send 200.0 (UpdateBoard 1 []))
+                                        |> processMoveResult game.turn progressGameSuccess (\_ _ -> ( game, Cmd.none ))
 
                                 Hover ->
                                     game
                                         |> applyMove (DisplayPiece (determineCellCoordinates cellmsg) (getPlayerPolarity game.turn game))
-                                        |> withCmd Cmd.none
+                                        |> alwaysCommand Cmd.none
 
                         _ ->
                             ( game, Cmd.none )
@@ -446,18 +457,48 @@ update msg game =
                             getAIMove x game
                     in
                     applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
-                        |> updateSuccessfulMove game.turn
-                        |> withCmd (send 200.0 (UpdateBoard 1 []))
+                        |> processMoveResult game.turn progressGameSuccess (\_ _ -> ( game, Cmd.none ))
 
                 _ ->
                     ( game, Cmd.none )
+
+        PlayAIMove ->
+            case game.status of
+                AI 0 ->
+                    let
+                        aiMove =
+                            game.randomMove.move
+                    in
+                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
+                        |> processMoveResult game.turn progressGameSuccess sendGetAIMove
+
+                AI 1 ->
+                    let
+                        aiMove =
+                            getAIMove 1 game
+                    in
+                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
+                        |> processMoveResult game.turn progressGameSuccess sendGetAIMove
+
+                _ ->
+                    ( game, Cmd.none )
+
+
+sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
+sendGetAIMove player game =
+    ( game, send 200.0 (UpdateBoard 1 []) )
+
+
+alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
+alwaysCommand msg { game, status } =
+    ( game, msg )
 
 
 getAIMove : Int -> Game -> MoveData
 getAIMove level game =
     case level of
         0 ->
-            getAIMoveEasy game.board
+            game.randomMove.move
 
         1 ->
             getAIMoveEasy game.board
@@ -468,24 +509,19 @@ getAIMove level game =
 
 withDetermineUpdateCommand : Int -> List Board -> GameMoveResult -> ( Game, Cmd Msg )
 withDetermineUpdateCommand magnitude previousStates gameMoveResult =
-    withCmd (determineUpdateComand magnitude previousStates gameMoveResult) gameMoveResult
+    withCmd (determineUpdateComand magnitude previousStates gameMoveResult.game) gameMoveResult.game
 
 
-determineUpdateComand : Int -> List Board -> GameMoveResult -> Cmd Msg
-determineUpdateComand magnitude previousStates { status, game } =
-    case status of
-        Success ->
-            case game.status of
-                Processing ->
-                    send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
+determineUpdateComand : Int -> List Board -> Game -> Cmd Msg
+determineUpdateComand magnitude previousStates game =
+    case game.status of
+        Processing ->
+            send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ]))
 
-                AI _ ->
-                    send 100.0 GetAIMove
+        AI _ ->
+            send 100.0 GetAIMove
 
-                _ ->
-                    Cmd.none
-
-        Failure ->
+        _ ->
             Cmd.none
 
 

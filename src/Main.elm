@@ -105,6 +105,11 @@ update msg screen =
                     Game.init settings
                         |> mapGameCmd
 
+                Tick posix ->
+                    { settings | time = posixToMillis posix }
+                        |> SettingsScreen
+                        |> withCmd Cmd.none
+
                 -- You shouldn't get any Gameplay messages from the Settings screen, but if you do, just return the current screen as-is.
                 _ ->
                     screen
@@ -123,10 +128,6 @@ update msg screen =
                         |> withCmd Cmd.none
 
                 -- You shouldn't get any Settings messages from the Gameplay screen, but if you do, just return the current screen as-is.
-                Tick time ->
-                    ( { game | time = posixToMillis time }, Cmd.none )
-                        |> mapGameCmd
-
                 _ ->
                     screen
                         |> withCmd Cmd.none
