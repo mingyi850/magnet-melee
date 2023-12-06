@@ -318,7 +318,6 @@ progressGameSuccess player game =
         , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
         , status = Processing
     }
-        |> checkGameOver
         |> withCmd (send 200.0 (UpdateBoard []))
 
 
@@ -330,26 +329,6 @@ processMoveResult player onSuccess onFailure moveResult =
 
         Failure ->
             onFailure player moveResult.game
-
-
-updateSuccessfulMove : Int -> GameMoveResult -> GameMoveResult
-updateSuccessfulMove player { status, game } =
-    case status of
-        Success ->
-            { status = status
-            , game =
-                { game
-                    | players =
-                        Dict.update player (Maybe.map (\playerData -> { playerData | remainingMoves = playerData.remainingMoves - 1 })) game.players
-                    , totalMoves = game.totalMoves + 1
-                    , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
-                    , status = Processing
-                }
-                    |> checkGameOver
-            }
-
-        Failure ->
-            { status = status, game = game }
 
 
 updatePlayerScores : Dict Int Player -> Dict Int Float -> Dict Int Player
@@ -404,15 +383,19 @@ simulateGameBoard steps prevGame currentGame =
 
 getGameStatus : Game -> GameStatus
 getGameStatus game =
-    case getPlayerAgency game.turn game of
-        Human ->
-            HumanMove
+    if checkGameOver game then
+        GameOver
 
-        AIEasy ->
-            AI 0
+    else
+        case getPlayerAgency game.turn game of
+            Human ->
+                HumanMove
 
-        AIMedium ->
-            AI 1
+            AIEasy ->
+                AI 0
+
+            AIMedium ->
+                AI 1
 
 
 updatePlayerPolarity : Int -> Polarity -> Game -> Game
@@ -423,14 +406,14 @@ updatePlayerPolarity player polarity game =
     }
 
 
-checkGameOver : Game -> Game
+checkGameOver : Game -> Bool
 checkGameOver game =
     -- Check if all remaining moves for all players is 0 or less
     if Dict.foldl (\player playerData accum -> (playerData.remainingMoves <= 0) && accum) True game.players then
-        { game | status = GameOver }
+        True
 
     else
-        game
+        False
 
 
 send : Float -> msg -> Cmd msg
@@ -570,9 +553,6 @@ determineUpdateCommand previousStates game =
 
         AI _ ->
             send 100.0 GenerateAIMove
-
-        GameOver ->
-            send 100.0 (UpdateBoard (List.append previousStates [ game.board ]))
 
         _ ->
             Cmd.none
