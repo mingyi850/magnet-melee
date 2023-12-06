@@ -16,6 +16,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Settings exposing (..)
+import Time exposing (..)
 
 
 
@@ -68,6 +69,7 @@ type Msg
     | GameplayMsg Game.Msg
     | ClickedStartGame
     | ClickedRestart
+    | Tick Posix
 
 
 {-| Helper function to allow piping of a Cmd Msg into a tuple with a Model.
@@ -121,6 +123,10 @@ update msg screen =
                         |> withCmd Cmd.none
 
                 -- You shouldn't get any Settings messages from the Gameplay screen, but if you do, just return the current screen as-is.
+                Tick time ->
+                    ( { game | time = posixToMillis time }, Cmd.none )
+                        |> mapGameCmd
+
                 _ ->
                     screen
                         |> withCmd Cmd.none
@@ -196,7 +202,7 @@ view screen =
 
 subscriptions : Sub Msg
 subscriptions =
-    Sub.none
+    Time.every 1000 Tick
 
 
 {-| The actual main entrypoint to run the application.

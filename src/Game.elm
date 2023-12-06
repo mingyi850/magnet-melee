@@ -25,6 +25,7 @@ import List exposing (..)
 import Models exposing (..)
 import MyCellGrid exposing (InteractionType(..), Msg)
 import Process
+import Random exposing (..)
 import Round exposing (..)
 import Settings exposing (..)
 import Svg exposing (..)
@@ -63,6 +64,7 @@ type alias Game =
     , players : Dict Int Player
     , playerPolarity : Polarity
     , status : GameStatus
+    , time : Int
     }
 
 
@@ -124,6 +126,7 @@ init settings =
             , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0, agent = getAgentFromInt (Maybe.withDefault 0 (Array.get player settings.playerAI)) } )) |> Dict.fromList
             , playerPolarity = Negative
             , status = HumanMove
+            , time = 0
             }
     in
     ( initialGame, Cmd.none )
@@ -197,6 +200,16 @@ applyMove move game =
 
                 Nothing ->
                     { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } coordinate game.board |> updateBoardMagneticField game.magnetism } }
+
+
+randomGenerator : Random.Generator ( Int, Int )
+randomGenerator =
+    Random.pair (Random.int 0 2) (Random.int 0 2)
+
+
+generateRandomNumber : Random.Generator ( Int, Int ) -> Game -> ( ( Int, Int ), Seed )
+generateRandomNumber generator game =
+    Random.step generator (initialSeed game.time)
 
 
 getGameScore : Game -> Dict Int Float
@@ -420,8 +433,6 @@ update msg game =
             if List.member game.board previousStates then
                 updateGameBoard (magnitude + 1) game
                     |> withDetermineUpdateCommand magnitude previousStates
-                -- withCmd (send 100.0 (UpdateBoard magnitude (List.append previousStates [ game.board ])))
-                {- ( { game | status = Ready }, Cmd.none ) -}
 
             else
                 updateGameBoard magnitude game
