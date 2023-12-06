@@ -202,7 +202,7 @@ generateRandomMove : Game -> RandomMove
 generateRandomMove game =
     let
         randomCoordinate =
-            Random.step (Random.pair (Random.int 0 game.board.config.gridDimensions) (Random.int 0 game.board.config.gridDimensions)) game.randomMove.seed
+            Random.step (Random.pair (Random.int 0 (game.board.config.gridDimensions - 1)) (Random.int 0 (game.board.config.gridDimensions - 1))) game.randomMove.seed
                 |> (\( ( x, y ), seed ) -> { x = x, y = y, seed = seed })
 
         randomPolarity =
@@ -213,12 +213,6 @@ generateRandomMove game =
                 Positive
     in
     { move = { x = randomCoordinate.x, y = randomCoordinate.y, polarity = randomPolarity }, seed = randomCoordinate.seed }
-
-
-generateRandomCoordinate : Game -> Cmd Coordinate
-generateRandomCoordinate game =
-    Random.generate (\( x, y ) -> { x = x, y = y })
-        (Random.pair (Random.int 0 game.board.config.gridDimensions) (Random.int 0 game.board.config.gridDimensions))
 
 
 getGameScore : Game -> Dict Int Float
@@ -452,12 +446,8 @@ update msg game =
         GetAIMove ->
             case game.status of
                 AI x ->
-                    let
-                        aiMove =
-                            getAIMove x game
-                    in
-                    applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
-                        |> processMoveResult game.turn progressGameSuccess (\_ _ -> ( game, Cmd.none ))
+                    { game | randomMove = generateRandomMove game }
+                        |> withCmd (send 0.0 PlayAIMove)
 
                 _ ->
                     ( game, Cmd.none )
