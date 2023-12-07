@@ -77,6 +77,7 @@ type alias GameMoveResult =
 type alias RandomMove =
     { move : MoveData
     , seed : Seed
+    , score : Float
     }
 
 
@@ -132,7 +133,7 @@ init settings =
             , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0, agent = getAgentFromInt (Maybe.withDefault 0 (Array.get player settings.playerAI)) } )) |> Dict.fromList
             , playerPolarity = Negative
             , status = getInitGameStatus settings
-            , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time }
+            , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = 0.0 }
             }
     in
     initialGame |> (\game -> withDetermineUpdateCommand game [] game)
@@ -226,8 +227,11 @@ generateRandomMove game =
 
             else
                 Positive
+
+        move =
+            { x = randomCoordinate.x, y = randomCoordinate.y, polarity = randomPolarity }
     in
-    { move = { x = randomCoordinate.x, y = randomCoordinate.y, polarity = randomPolarity }, seed = randomCoordinate.seed }
+    { move = move, seed = randomCoordinate.seed, score = getMoveScore game.turn move game }
 
 
 getGameScore : Game -> Dict Int Float
@@ -283,7 +287,7 @@ getPlayerAgency player game =
 -}
 type Msg
     = ModelMsg Models.Msg
-    | GenerateAIMove
+    | GenerateAIMove Int
     | PlayAIMove
     | UpdateBoard (List Board)
     | UpdatePlayerPolarity Int Polarity
@@ -458,11 +462,32 @@ update msg game =
             updateGameBoard (previousStatesCount + 1) game
                 |> withDetermineUpdateCommand game previousStates
 
-        GenerateAIMove ->
+        GenerateAIMove num ->
             case game.status of
-                AI x ->
+                AI 0 ->
                     { game | randomMove = generateRandomMove game }
                         |> withCmd (send 0.0 PlayAIMove)
+
+                AI 1 ->
+                    if num == 0 then
+                        game
+                            |> withCmd (send 0.0 PlayAIMove)
+
+                    else
+                        let
+                            newMove =
+                                generateRandomMove game
+
+                            newMoveScore =
+                                getMoveScore game.turn newMove.move game
+                        in
+                        (if newMoveScore > game.randomMove.score then
+                            { game | randomMove = newMove }
+
+                         else
+                            { game | randomMove = { move = game.randomMove.move, score = game.randomMove.score, seed = newMove.seed } }
+                        )
+                            |> withCmd (send 0.0 (GenerateAIMove (num - 1)))
 
                 _ ->
                     ( game, Cmd.none )
@@ -472,7 +497,7 @@ update msg game =
                 AI x ->
                     let
                         aiMove =
-                            getAIMove x game
+                            game.randomMove.move
                     in
                     applyMove (PlacePiece { x = aiMove.x, y = aiMove.y } aiMove.polarity) game
                         |> processMoveResult game.turn progressGameSuccess sendGetAIMove
@@ -483,7 +508,7 @@ update msg game =
 
 sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
 sendGetAIMove player game =
-    ( game, send 200.0 (UpdateBoard []) )
+    ( game, send 200.0 (GenerateAIMove 0) )
 
 
 alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
@@ -491,33 +516,24 @@ alwaysCommand msg { game, status } =
     ( game, msg )
 
 
-getAIMove : Int -> Game -> MoveData
-getAIMove level game =
-    case level of
-        0 ->
-            game.randomMove.move
-
-        1 ->
-            getAIMoveGreedy game.turn game
-
-        _ ->
-            getAIMoveGreedy game.turn game
-
-
 getMoveScore : Int -> MoveData -> Game -> Float
 getMoveScore player move game =
-    let
-        newGame =
-            { game | board = insertPiece { player = player, polarity = move.polarity } { x = move.x, y = move.y } game.board }
+    if isSpaceFree game.board { x = move.x, y = move.y } then
+        let
+            newGame =
+                { game | board = insertPiece { player = player, polarity = move.polarity } { x = move.x, y = move.y } game.board }
 
-        simulatedGame =
-            simulateGameBoard 20 game newGame
-    in
-    getAvgScoreMargin player simulatedGame
+            simulatedGame =
+                simulateGameBoard 20 game newGame
+        in
+        getAvgScoreMargin player simulatedGame
+
+    else
+        -1.0
 
 
-getAIMoveGreedy : Int -> Game -> MoveData
-getAIMoveGreedy player game =
+getAIMoveGreedy : Game -> MoveData
+getAIMoveGreedy game =
     let
         freeCoordinates =
             getFreeCoordinates game.board
@@ -526,11 +542,16 @@ getAIMoveGreedy player game =
             List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Positive }) freeCoordinates
                 ++ List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Negative }) freeCoordinates
     in
+    getBestMove game possibleMoves
+
+
+getBestMove : Game -> List MoveData -> MoveData
+getBestMove game movesList =
     List.map
         (\move ->
-            { move = move, score = getMoveScore player move game }
+            { move = move, score = getMoveScore game.turn move game }
         )
-        possibleMoves
+        movesList
         |> List.sortBy (\move -> move.score)
         |> List.reverse
         |> List.head
@@ -549,8 +570,11 @@ determineUpdateCommand previousGame previousStates game =
         Processing ->
             send 100.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
 
-        AI _ ->
-            send 100.0 GenerateAIMove
+        AI 0 ->
+            send 100.0 (GenerateAIMove 0)
+
+        AI 1 ->
+            send 100.0 (GenerateAIMove 100)
 
         _ ->
             Cmd.none
@@ -606,10 +630,10 @@ polarityPickChoiceConfig player game =
     }
 
 
-viewPolaritySelector : GamePickChoiceButtonsConfig -> Html Msg
-viewPolaritySelector data =
+viewPolaritySelector : Game -> GamePickChoiceButtonsConfig -> Html Msg
+viewPolaritySelector game data =
     div [ class "setting-picker-item" ]
-        [ label [ id "polarity-picker-label", class "setting-picker-item-label" ] [ Html.text data.label ]
+        [ label [ id "polarity-picker-label", class "setting-picker-item-label", Html.Attributes.style "font-size" (px (20 - (2 * Dict.size game.players))) ] [ Html.text data.label ]
         , div [ class "setting-picker-item-input setting-picker-item-input-buttons" ]
             (List.map
                 (\{ label, onSelect, isSelected } ->
@@ -618,6 +642,7 @@ viewPolaritySelector data =
                         , class ("setting-picker-item-button setting-picker-item-button-" ++ String.replace " " "-" label)
                         , classList [ ( "selected", isSelected ) ]
                         , onClick onSelect
+                        , Html.Attributes.style "font-size" (px (30 - (3 * Dict.size game.players)))
                         ]
                         [ Html.text label ]
                 )
@@ -633,7 +658,7 @@ getPlayerContainers game =
 
 getPlayerScoreContainers : Game -> List (Html Msg)
 getPlayerScoreContainers game =
-    Dict.values (Dict.map (\index playerData -> playerScoreContainer index playerData) game.players)
+    Dict.values (Dict.map (\index playerData -> playerScoreContainer game index playerData) game.players)
 
 
 getGameWinner : Game -> Int
@@ -661,7 +686,7 @@ getGameOverContainer game =
         div [ id "game-over", class "game-over-container" ]
             [ div [ id "game-over-headers", class "game-over-header-container" ]
                 [ h1 [ id "game-over-subheader" ] [ Html.text "Winner: " ]
-                , div [ id "player-numbers-row", class "player-number-row" ] [ playerNumContainer (getGameWinner game) ]
+                , div [ id "player-numbers-row", class "player-number-row" ] [ playerNumContainer game (getGameWinner game) ]
                 ]
             , div [ id "game-over-scores", class "game-over-scores-container" ]
                 [ h1 [ id "game-over-subheader" ] [ Html.text "Scores: " ]
@@ -673,22 +698,22 @@ getGameOverContainer game =
         div [] []
 
 
-playerNumContainer : Int -> Html Msg
-playerNumContainer playerNum =
+playerNumContainer : Game -> Int -> Html Msg
+playerNumContainer game playerNum =
     div [ id "num-container", class "player-number-container" ]
         [ div [ id "player-color", class "player-color-indicator" ]
-            [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width "40px", Svg.Attributes.height "40px" ]
+            [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width (px (60 - (10 * Dict.size game.players))), Svg.Attributes.height (px (60 - (10 * Dict.size game.players))) ]
                 [ Svg.circle [ Svg.Attributes.cx "50%", Svg.Attributes.cy "50%", Svg.Attributes.r "50%", Svg.Attributes.fill (toCssString (playerColorToColor (getPlayerColor playerNum))) ] [] ]
             ]
-        , h1 [ id "player-num", class "player-number" ]
+        , h1 [ id "player-num", class "player-number", Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ]
             [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]
         ]
 
 
-playerScoreContainer : Int -> Player -> Html Msg
-playerScoreContainer playerNum player =
+playerScoreContainer : Game -> Int -> Player -> Html Msg
+playerScoreContainer game playerNum player =
     div [ id "player-score", class "player-score-container" ]
-        [ playerNumContainer playerNum
+        [ playerNumContainer game playerNum
         , div [ class "player-score-container" ]
             [ h2 [ id "score-box" ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
         ]
@@ -706,13 +731,13 @@ getPlayersOrGameOverContainer game =
 playerContainer : Int -> Player -> Game -> Html Msg
 playerContainer playerNum player game =
     div [ id "player-info", class "player-container" ]
-        [ playerNumContainer playerNum
-        , div [ class "player-moves-container" ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
-        , viewPolaritySelector (polarityPickChoiceConfig playerNum game)
+        [ playerNumContainer game playerNum
+        , div [ class "player-moves-container", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
+        , viewPolaritySelector game (polarityPickChoiceConfig playerNum game)
 
         --, div [ class "player-polarity-container" ] [ div [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
         , div [ class "player-score-box" ]
-            [ div [ id "score-box" ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
+            [ div [ id "score-box", Html.Attributes.style "font-size" (px (30 - (3 * Dict.size game.players))) ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
         ]
 
 
@@ -720,10 +745,10 @@ getTurnDisplay : GameStatus -> Game -> Html Msg
 getTurnDisplay status game =
     case status of
         HumanMove ->
-            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game.turn ]
+            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game game.turn ]
 
         AI _ ->
-            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game.turn ]
+            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game game.turn ]
 
         Processing ->
             div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Processing   " ] ]

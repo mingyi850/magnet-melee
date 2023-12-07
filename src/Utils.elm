@@ -42,3 +42,13 @@ toCssString color =
         ++ "%,"
         ++ String.fromFloat (roundTo a)
         ++ ")"
+
+
+px : Int -> String
+px x =
+    String.fromInt x ++ "px"
+
+
+pc : Int -> String
+pc x =
+    String.fromInt x ++ "%"

@@ -2,7 +2,7 @@
 title="My Game"
 
 [extra]
-team="My Team Name"
+team="Ming"
 thumbnail="thumbnail.png"
 +++
 

@@ -620,80 +620,6 @@ type alias AIMove =
     }
 
 
-getDominantPolarity : Board -> Polarity
-getDominantPolarity board =
-    let
-        polaritySway =
-            board.pieces
-                |> Dict.values
-                |> List.map (\piece -> piece.polarity)
-                |> List.foldl
-                    (\polarity accum ->
-                        if polarity == Positive then
-                            accum + 1
-
-                        else
-                            accum - 1
-                    )
-                    0
-    in
-    if polaritySway > 0 then
-        Positive
-
-    else
-        Negative
-
-
-getMoveNearCoordinate : Coordinate -> Board -> List FloatVector -> Int -> Coordinate
-getMoveNearCoordinate coordinate board vectors magnitude =
-    case vectors of
-        [] ->
-            getMoveNearCoordinate coordinate board (pieceMagneticFieldDirs (toFloat magnitude)) (magnitude + 1)
-
-        vector :: rest ->
-            let
-                tentativeNext =
-                    movePieceCoordinate coordinate (scaledUnit magnitude vector)
-
-                tentativeNextPiece =
-                    getPieceFromCoordinate board tentativeNext
-            in
-            case tentativeNextPiece of
-                Just _ ->
-                    getMoveNearCoordinate tentativeNext board rest magnitude
-
-                Nothing ->
-                    tentativeNext
-
-
-getAIMoveEasy : Board -> AIMove
-getAIMoveEasy board =
-    let
-        dominantPolarity =
-            getDominantPolarity board
-
-        piecePolarity =
-            if dominantPolarity == Positive then
-                Negative
-
-            else
-                Positive
-
-        currentCoordinates =
-            Array.fromList (Dict.values board.pieceCoordinates)
-
-        currentCoordinatesMiddle =
-            Array.length currentCoordinates // 3
-
-        middleCoordinate =
-            Maybe.withDefault { x = board.config.gridDimensions // 2, y = board.config.gridDimensions // 2 } (Array.get currentCoordinatesMiddle currentCoordinates)
-
-        coordinates =
-            getMoveNearCoordinate middleCoordinate board (pieceMagneticFieldDirs 1) 2
-    in
-    { x = coordinates.x, y = coordinates.y, polarity = piecePolarity }
-
-
 getFreeCoordinates : Board -> List Coordinate
 getFreeCoordinates board =
     let
@@ -706,6 +632,16 @@ getFreeCoordinates board =
                 |> List.concat
     in
     List.filter (\coordinate -> not (List.member coordinate currentTaken)) allCoordinates
+
+
+isSpaceFree : Board -> Coordinate -> Bool
+isSpaceFree board coordinate =
+    case Dict.get (toTuple coordinate) board.coordinatePieces of
+        Just _ ->
+            False
+
+        Nothing ->
+            True
 
 
 
