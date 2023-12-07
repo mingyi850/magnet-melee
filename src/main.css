@@ -426,3 +426,10 @@ button#restart-button:active {
 .player-number-container>* {
   margin-right: 0px;
 }
+
+.player-number {
+  padding: 0px;
+  margin: 5px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
