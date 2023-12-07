@@ -319,6 +319,7 @@ progressGameSuccess player game =
         , totalMoves = game.totalMoves + 1
         , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
         , status = Processing
+        , randomMove = { move = game.randomMove.move, seed = game.randomMove.seed, score = -999999.0 }
     }
         |> withCmd (send 200.0 (UpdateBoard []))
 
@@ -508,7 +509,7 @@ update msg game =
 
 sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
 sendGetAIMove player game =
-    ( game, send 200.0 (GenerateAIMove 0) )
+    ( game, send 200.0 (GenerateAIMove 1) )
 
 
 alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
@@ -529,7 +530,7 @@ getMoveScore player move game =
         getAvgScoreMargin player simulatedGame
 
     else
-        -1.0
+        -999999.0
 
 
 getAIMoveGreedy : Game -> MoveData
@@ -574,7 +575,7 @@ determineUpdateCommand previousGame previousStates game =
             send 100.0 (GenerateAIMove 0)
 
         AI 1 ->
-            send 100.0 (GenerateAIMove 100)
+            send 100.0 (GenerateAIMove (game.gridSize * 20))
 
         _ ->
             Cmd.none

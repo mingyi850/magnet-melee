@@ -124,7 +124,8 @@ renderPiece style position value =
             , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.textAnchor "middle"
             , Svg.Attributes.alignmentBaseline "middle"
-            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2.5))
+            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2))
+            , Svg.Attributes.strokeWidth (String.fromFloat (style.gridLineWidth * 2.0))
             , Svg.Attributes.fill (toCssString Color.black)
             , Svg.Attributes.z "1000"
             , Mouse.onDown (onMouseDown position)
