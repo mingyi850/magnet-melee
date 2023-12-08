@@ -166,8 +166,8 @@ getInitGameStatus settings =
 -}
 type Move
     = SelectPolarity Int Polarity
-    | PlacePiece Coordinate Polarity
-    | DisplayPiece Coordinate Polarity
+    | PlacePiece BoardCoordinate Polarity
+    | DisplayPiece BoardCoordinate Polarity
 
 
 type Status
@@ -202,6 +202,7 @@ applyMove move game =
                             | board =
                                 removeTentativePieces game.board
                                     |> insertPiece { player = game.turn, polarity = polarity } coordinate
+                                    |> updateBoardMagneticField game.magnetism
                         }
                     }
 
@@ -304,7 +305,7 @@ withCmd cmd game =
 {- Get Cell Coordinates from CellGrid Click -}
 
 
-determineCellCoordinates : MyCellGrid.Msg -> Coordinate
+determineCellCoordinates : MyCellGrid.Msg -> BoardCoordinate
 determineCellCoordinates cellMsg =
     { x = cellMsg.cell.column
     , y = cellMsg.cell.row
@@ -358,11 +359,11 @@ updateGameBoard magnitude game =
 
         newGame =
             { game
-                | board = updateBoardMagneticField game.magnetism (updatePiecePositions magnitude (updateBoardMagneticField game.magnetism game.board))
+                | board = updateBoardMagneticField game.magnetism (updatePiecePositions magnitude game.board)
                 , players = updatePlayerScores game.players gameScores
             }
     in
-    if newGame == game then
+    if newGame.board.pieceCoordinates == game.board.pieceCoordinates then
         case game.status of
             Processing ->
                 { newGame | status = getGameStatus game }

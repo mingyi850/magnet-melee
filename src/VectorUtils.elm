@@ -44,6 +44,11 @@ unit vector =
     { x = x, y = y }
 
 
+multiplyVector : Float -> FloatVector -> FloatVector
+multiplyVector scale vector =
+    { x = vector.x * scale, y = vector.y * scale }
+
+
 scaledUnit : Int -> FloatVector -> IntVector
 scaledUnit scale vector =
     let

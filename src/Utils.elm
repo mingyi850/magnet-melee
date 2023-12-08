@@ -6,7 +6,22 @@ import Dict exposing (..)
 
 addDicts : Dict Int Float -> Dict Int Float -> Dict Int Float
 addDicts dict1 dict2 =
-    Dict.foldl (\key value existing -> Dict.update key (\existingValue -> Maybe.map ((+) value) existingValue) existing) dict1 dict2
+    Dict.foldl
+        (\key value existing ->
+            case Dict.get key existing of
+                Nothing ->
+                    Dict.insert key value existing
+
+                Just value2 ->
+                    Dict.insert key (value + value2) existing
+        )
+        dict1
+        dict2
+
+
+combineDicts : Dict comparable b -> Dict comparable b -> Dict comparable b
+combineDicts dict1 dict2 =
+    Dict.foldl (\key value existing -> Dict.insert key value existing) dict1 dict2
 
 
 toCssString : Color -> String
