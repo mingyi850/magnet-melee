@@ -27,11 +27,11 @@ import MyCellGrid exposing (InteractionType(..), Msg)
 import Process
 import Random exposing (..)
 import Round exposing (..)
-import Settings exposing (..)
 import Svg exposing (..)
 import Svg.Attributes
 import Task
 import Utils exposing (..)
+import VariableSettings as Settings exposing (..)
 
 
 
@@ -652,6 +652,21 @@ viewPolaritySelector game data =
         ]
 
 
+polarityPickChoiceConfig2 : Int -> Game -> PickChoiceButtonsConfig Msg
+polarityPickChoiceConfig2 player game =
+    { label = "Player Polarity"
+    , options =
+        [ { label = "+", onSelect = UpdatePlayerPolarity player Positive, isSelected = getPlayerPolarity player game == Positive }
+        , { label = "-", onSelect = UpdatePlayerPolarity player Negative, isSelected = getPlayerPolarity player game == Negative }
+        ]
+    }
+
+
+viewPolaritySelector2 : Game -> PickChoiceButtonsConfig Msg -> Html Msg
+viewPolaritySelector2 game data =
+    viewPickerItem [ Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
+
+
 getPlayerContainers : Game -> List (Html Msg)
 getPlayerContainers game =
     Dict.values (Dict.map (\index playerData -> playerContainer index playerData game) game.players)
@@ -735,6 +750,7 @@ playerContainer playerNum player game =
         [ playerNumContainer game playerNum
         , div [ class "player-moves-container", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
         , viewPolaritySelector game (polarityPickChoiceConfig playerNum game)
+        , viewPolaritySelector2 game (polarityPickChoiceConfig2 playerNum game)
 
         --, div [ class "player-polarity-container" ] [ div [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
         , div [ class "player-score-box" ]

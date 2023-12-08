@@ -15,8 +15,8 @@ import Game exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Settings exposing (..)
 import Time exposing (..)
+import VariableSettings as Settings exposing (..)
 
 
 
