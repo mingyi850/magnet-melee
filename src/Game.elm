@@ -605,7 +605,7 @@ getBoardView : Game -> Html Msg
 getBoardView game =
     Html.map ModelMsg
         (div [ id "board-container", class "game-board" ]
-            [ boardHtml game.board ]
+            [ boardHtml game.magnetism game.board ]
         )
 
 

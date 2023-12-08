@@ -135,7 +135,7 @@ pickers settings =
         { label = "GridSize"
         , value = settings.gridSize
         , min = 5
-        , max = 50
+        , max = 100
         , onChange = SetGridSize
         }
     , inputIntRange
