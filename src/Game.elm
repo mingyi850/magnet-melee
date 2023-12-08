@@ -576,7 +576,7 @@ determineUpdateCommand previousGame previousStates game =
             send 100.0 (GenerateAIMove 0)
 
         AI 1 ->
-            send 100.0 (GenerateAIMove (game.gridSize * 20))
+            send 100.0 (GenerateAIMove (game.gridSize * 2))
 
         _ ->
             Cmd.none
@@ -720,7 +720,7 @@ playerNumContainer game playerNum =
     div [ id "num-container", class "player-number-container" ]
         [ div [ id "player-color", class "player-color-indicator" ]
             [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width (px (60 - (10 * Dict.size game.players))), Svg.Attributes.height (px (60 - (10 * Dict.size game.players))) ]
-                [ Svg.circle [ Svg.Attributes.cx "50%", Svg.Attributes.cy "50%", Svg.Attributes.r "50%", Svg.Attributes.fill (toCssString (playerColorToColor (getPlayerColor playerNum))) ] [] ]
+                [ Svg.circle [ Svg.Attributes.cx "50%", Svg.Attributes.cy "50%", Svg.Attributes.r "50%", Svg.Attributes.fill (toCssString (getPieceColor { player = playerNum, polarity = None })) ] [] ]
             ]
         , h1 [ id "player-num", class "player-number", Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ]
             [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]

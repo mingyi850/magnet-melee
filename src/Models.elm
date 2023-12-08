@@ -153,20 +153,20 @@ emptyHsla =
     { hue = 0, saturation = 0, lightness = 0, alpha = 0 }
 
 
-playerColorToHsla : PlayerColor -> Float -> Float -> Float -> Hsla
-playerColorToHsla playerColor strength totalStrength gameMagnetism =
+playerColorToHslaBoard : PlayerColor -> Float -> Float -> Float -> Hsla
+playerColorToHslaBoard playerColor strength totalStrength gameMagnetism =
     case playerColor of
         Red ->
-            { hue = hueToRadians 0, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
+            { hue = hueToRadians 0, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
 
         Blue ->
-            { hue = hueToRadians 240, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
+            { hue = hueToRadians 240, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
 
         Green ->
-            { hue = hueToRadians 120, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
+            { hue = hueToRadians 120, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
 
         Yellow ->
-            { hue = hueToRadians 60, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
+            { hue = hueToRadians 60, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
 
         White ->
             { hue = hueToRadians 0, saturation = 1, lightness = 1, alpha = 0 }
@@ -209,9 +209,23 @@ emptyMagneticField =
     }
 
 
-playerColorToColor : PlayerColor -> Color.Color
-playerColorToColor color =
-    colorFromTuple (playerColorToRGB color)
+getPieceColor : Piece -> Color.Color
+getPieceColor piece =
+    let
+        lightness =
+            case piece.polarity of
+                Positive ->
+                    0.75
+
+                Negative ->
+                    0.25
+
+                None ->
+                    0.5
+    in
+    playerColorToHslaBoard (getPlayerColor piece.player) 1 1 1
+        |> (\hsla -> { hsla | lightness = lightness, alpha = 1 })
+        |> hslaToColor
 
 
 type Polarity
@@ -848,7 +862,7 @@ getMagneticFieldColor magnetism field =
         )
         ( 1, -1000 )
         field.playerStrength
-        |> (\( player, strength ) -> playerColorToHsla (getPlayerColor player) strength totalStrength (toFloat magnetism))
+        |> (\( player, strength ) -> playerColorToHslaBoard (getPlayerColor player) strength totalStrength (toFloat magnetism))
         |> hslaToColor
 
 
@@ -856,10 +870,10 @@ getPieceColorFromContent : CellContent -> Color.Color
 getPieceColorFromContent content =
     case content of
         GridPiece piece ->
-            playerColorToColor (getPlayerColor piece.player)
+            getPieceColor piece
 
         PieceOnField piece _ ->
-            playerColorToColor (getPlayerColor piece.player)
+            getPieceColor piece
 
         _ ->
             Color.white
@@ -901,7 +915,8 @@ cellStyle magnetism board =
     , cellWidth = toFloat (board.config.displaySize // board.config.gridDimensions)
     , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
     , gridLineColor = Color.rgb 0 0 0
-    , gridLineWidth = toFloat (board.config.displaySize // board.config.gridDimensions) / 20
+    , gridLineWidth = 0 --toFloat (board.config.displaySize // board.config.gridDimensions) / 20
+    , pieceLineWidth = toFloat (board.config.displaySize // board.config.gridDimensions) / 5
     , shouldRenderPiece =
         \content ->
             case content of

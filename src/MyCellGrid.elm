@@ -44,6 +44,7 @@ type alias CellStyle a =
     , toCellOpacity : a -> Float
     , toText : a -> String
     , gridLineWidth : Float
+    , pieceLineWidth : Float
     , gridLineColor : Color
     , shouldRenderPiece : a -> Bool
     }
@@ -110,8 +111,8 @@ renderPiece style position value =
         [ Svg.circle
             [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-            , Svg.Attributes.r (String.fromFloat (style.cellWidth / 2.5))
-            , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
+            , Svg.Attributes.r (String.fromFloat style.cellWidth)
+            , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
             , Svg.Attributes.fill (toCssString (style.toPieceColor value))
             , Svg.Attributes.stroke (toCssString style.gridLineColor)
             , Svg.Attributes.fillOpacity "1"
@@ -124,7 +125,7 @@ renderPiece style position value =
             , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.textAnchor "middle"
             , Svg.Attributes.alignmentBaseline "middle"
-            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2))
+            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth * 2))
             , Svg.Attributes.strokeWidth (String.fromFloat (style.gridLineWidth * 2.0))
             , Svg.Attributes.fill (toCssString Color.black)
             , Svg.Attributes.z "1000"
