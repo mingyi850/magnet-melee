@@ -75,6 +75,32 @@ scaledUnit scale vector =
     { x = x, y = y }
 
 
+scaledIntUnit : Int -> IntVector -> IntVector
+scaledIntUnit scale vector =
+    let
+        x =
+            if vector.x == 0 then
+                0
+
+            else if vector.x > 0 then
+                scale
+
+            else
+                -scale
+
+        y =
+            if vector.y == 0 then
+                0
+
+            else if vector.y > 0 then
+                scale
+
+            else
+                -scale
+    in
+    { x = x, y = y }
+
+
 unitIntVector : IntVector -> IntVector
 unitIntVector vector =
     let

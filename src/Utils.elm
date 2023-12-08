@@ -54,7 +54,6 @@ mergeHslas hslaList =
     List.foldl (\hsla accum -> addHslaVectors (hslaToVector hsla) accum) zeroHslaVector hslaList
         |> divHslaVector (toFloat (List.length hslaList))
         |> hslaVectorToHsla
-        |> validateHsla
 
 
 addHslaVectors : HslaVector -> HslaVector -> HslaVector
@@ -73,17 +72,6 @@ divHslaVector divisor hsla =
     , z = hsla.z / divisor
     , a = hsla.a / divisor
     }
-
-
-validateHsla : Hsla -> Hsla
-validateHsla hsla =
-    if hsla.hue < 0.0 || hsla.hue > 360.0 then
-        Debug.log ("hue out of range" ++ toString hsla)
-            maxHsla
-
-    else
-        Debug.log ("hue in range" ++ toString hsla)
-            hsla
 
 
 hslaVectorToHsla : HslaVector -> Hsla
