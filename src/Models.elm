@@ -462,21 +462,21 @@ getCoordinatePieces board =
 
 
 getMagneticFieldForCoordinate : Board -> Int -> BoardCoordinate -> MagneticField
-getMagneticFieldForCoordinate board magnitude coordinate =
+getMagneticFieldForCoordinate board magnetism coordinate =
     let
         coordinatePieces =
             getCoordinatePieces board
     in
     List.foldl
         (\( coord, piece ) existingFields ->
-            mergeMagneticFields existingFields (getFieldFromPieceAtCoordinate magnitude coordinate coord piece)
+            mergeMagneticFields existingFields (getFieldFromPieceAtCoordinate magnetism coordinate coord piece)
         )
         emptyMagneticField
         coordinatePieces
 
 
 getFieldFromPieceAtCoordinate : Int -> BoardCoordinate -> BoardCoordinate -> Piece -> MagneticField
-getFieldFromPieceAtCoordinate magnitude coordinate pieceCoordinate piece =
+getFieldFromPieceAtCoordinate magnetism coordinate pieceCoordinate piece =
     if coordinate == pieceCoordinate then
         emptyMagneticField
 
@@ -496,7 +496,7 @@ getFieldFromPieceAtCoordinate magnitude coordinate pieceCoordinate piece =
                     0
 
                 else
-                    toFloat magnitude / (eDistance ^ 2)
+                    toFloat magnetism / (eDistance ^ 2)
 
             resultantVector =
                 { x = distanceVector.x * magnetStrength / distanceVectorSum

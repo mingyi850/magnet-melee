@@ -570,7 +570,7 @@ determineUpdateCommand : Game -> List Board -> Game -> Cmd Msg
 determineUpdateCommand previousGame previousStates game =
     case game.status of
         Processing ->
-            send 100.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
+            send 0.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
 
         AI 0 ->
             send 100.0 (GenerateAIMove 0)

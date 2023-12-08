@@ -142,7 +142,7 @@ pickers settings =
         { label = "Magnetism"
         , value = settings.magnetism
         , min = 2
-        , max = settings.gridSize // 2
+        , max = settings.gridSize * 20
         , onChange = SetMagnetism
         }
     , inputIntRange
