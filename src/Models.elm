@@ -157,16 +157,16 @@ playerColorToHsla : PlayerColor -> Float -> Float -> Float -> Hsla
 playerColorToHsla playerColor strength totalStrength gameMagnetism =
     case playerColor of
         Red ->
-            { hue = hueToRadians 0, saturation = 1, lightness = 0.5, alpha = strength / totalStrength }
+            { hue = hueToRadians 0, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
 
         Blue ->
-            { hue = hueToRadians 240, saturation = 1, lightness = 0.5, alpha = strength / totalStrength }
+            { hue = hueToRadians 240, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
 
         Green ->
-            { hue = hueToRadians 120, saturation = 1, lightness = 0.5, alpha = strength / totalStrength }
+            { hue = hueToRadians 120, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
 
         Yellow ->
-            { hue = hueToRadians 60, saturation = 1, lightness = 0.5, alpha = strength / totalStrength }
+            { hue = hueToRadians 60, saturation = 1, lightness = 0.5 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
 
         White ->
             { hue = hueToRadians 0, saturation = 1, lightness = 1, alpha = 0 }
