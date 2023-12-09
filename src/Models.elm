@@ -163,10 +163,31 @@ playerColorToHslaBoard playerColor strength totalStrength gameMagnetism =
             { hue = hueToRadians 240, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
 
         Green ->
-            { hue = hueToRadians 120, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
+            { hue = hueToRadians 120, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
 
         Yellow ->
-            { hue = hueToRadians 60, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 5), alpha = strength / totalStrength }
+            { hue = hueToRadians 60, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
+
+        White ->
+            { hue = hueToRadians 0, saturation = 1, lightness = 1, alpha = 0 }
+
+
+playerColorToHslaBoard2 : Int -> PlayerColor -> Float -> Float -> Float -> Hsla
+playerColorToHslaBoard2 totalPieces playerColor strength totalStrength gameMagnetism =
+    case playerColor of
+        Red ->
+            --Debug.log
+            --    (toString strength ++ " " ++ toString totalPieces ++ " " ++ toString gameMagnetism)
+            { hue = hueToRadians 0, saturation = 1, lightness = 0.75 - (0.5 * Basics.sqrt (strength / toFloat totalPieces / gameMagnetism)), alpha = 0.9 }
+
+        Blue ->
+            { hue = hueToRadians 240, saturation = 1, lightness = 0.75 - (0.5 * Basics.sqrt (strength / toFloat totalPieces / gameMagnetism)), alpha = 0.9 }
+
+        Green ->
+            { hue = hueToRadians 120, saturation = 1, lightness = 0.75 - (0.5 * (strength / toFloat totalPieces / gameMagnetism)), alpha = 0.9 }
+
+        Yellow ->
+            { hue = hueToRadians 60, saturation = 1, lightness = 0.75 - (0.5 * (strength / toFloat totalPieces / gameMagnetism)), alpha = 0.9 }
 
         White ->
             { hue = hueToRadians 0, saturation = 1, lightness = 1, alpha = 0 }
@@ -175,11 +196,6 @@ playerColorToHslaBoard playerColor strength totalStrength gameMagnetism =
 getLigthness : Float -> Float -> Float
 getLigthness strength gameMagnetism =
     strength / gameMagnetism / 1.2 - 0.1
-
-
-hueToRadians : Float -> Float
-hueToRadians hue =
-    hue / 360
 
 
 hslaToColor : Hsla -> Color.Color
@@ -814,8 +830,8 @@ boardHtml magnetism board =
     Html.map CellGridMessage (MyCellGrid.asHtml { width = board.config.displaySize, height = board.config.displaySize } (cellStyle magnetism board) (getCellGrid board))
 
 
-getCellColorFromContent : Int -> CellContent -> Color.Color
-getCellColorFromContent magnetism content =
+getCellColorFromContent : Int -> Int -> CellContent -> Color.Color
+getCellColorFromContent totalPieces magnetism content =
     case content of
         GridPiece piece ->
             Color.darkGrey
@@ -824,10 +840,10 @@ getCellColorFromContent magnetism content =
             Color.darkGrey
 
         GridMagneticField field ->
-            getMagneticFieldColor magnetism field
+            getMagneticFieldColor2 totalPieces magnetism field
 
-        PieceOnField _ field ->
-            getMagneticFieldColor magnetism field
+        PieceOnField piece field ->
+            getPieceColor piece
 
 
 getCellOpacityFromContent : Float -> CellContent -> Float
@@ -866,6 +882,18 @@ getMagneticFieldColor magnetism field =
         |> hslaToColor
 
 
+getMagneticFieldColor2 : Int -> Int -> MagneticField -> Color.Color
+getMagneticFieldColor2 totalPieces magnetism field =
+    let
+        totalStrength =
+            Dict.foldl (\player strength total -> total + strength) 0 field.playerStrength
+    in
+    Dict.map (\player strength -> ( playerColorToHslaBoard2 totalPieces (getPlayerColor player) strength totalStrength (toFloat magnetism), strength / totalStrength )) field.playerStrength
+        |> Dict.values
+        |> mergeHslas
+        |> fromHsla
+
+
 getPieceColorFromContent : CellContent -> Color.Color
 getPieceColorFromContent content =
     case content of
@@ -897,7 +925,7 @@ getTextFromContent content =
 
 cellStyle : Int -> Board -> MyCellGrid.CellStyle CellContent
 cellStyle magnetism board =
-    { toCellColor = \z -> getCellColorFromContent magnetism z
+    { toCellColor = \z -> getCellColorFromContent (Dict.size board.pieces + Dict.size board.tentativePieces) magnetism z
     , toPieceColor = \z -> getPieceColorFromContent z
     , toCellOpacity = \z -> getCellOpacityFromContent 0.7 z
     , toText = \content -> getTextFromContent content

@@ -49,10 +49,10 @@ maxHsla =
     }
 
 
-mergeHslas : List Hsla -> Hsla
+mergeHslas : List ( Hsla, Float ) -> Hsla
 mergeHslas hslaList =
-    List.foldl (\hsla accum -> addHslaVectors (hslaToVector hsla) accum) zeroHslaVector hslaList
-        |> divHslaVector (toFloat (List.length hslaList))
+    List.foldl (\( hsla, strength ) accum -> addHslaVectors (hslaToVector hsla strength) accum) zeroHslaVector hslaList
+        --|> divHslaVector (toFloat (List.length hslaList))
         |> hslaVectorToHsla
 
 
@@ -61,7 +61,7 @@ addHslaVectors hsla1 hsla2 =
     { x = hsla1.x + hsla2.x
     , y = hsla1.y + hsla2.y
     , z = hsla1.z + hsla2.z
-    , a = hsla1.a + hsla2.a
+    , a = Basics.max hsla1.a hsla2.a
     }
 
 
@@ -70,24 +70,24 @@ divHslaVector divisor hsla =
     { x = hsla.x / divisor
     , y = hsla.y / divisor
     , z = hsla.z / divisor
-    , a = hsla.a / divisor
+    , a = hsla.a
     }
 
 
 hslaVectorToHsla : HslaVector -> Hsla
 hslaVectorToHsla hslaVector =
-    { hue = Basics.atan2 hslaVector.y hslaVector.x * 180 / Basics.pi + 360
+    { hue = hueToRadians (Basics.atan2 hslaVector.y hslaVector.x * 180 / Basics.pi + 360)
     , saturation = Basics.sqrt (hslaVector.x * hslaVector.x + hslaVector.y * hslaVector.y)
     , lightness = hslaVector.z
     , alpha = hslaVector.a
     }
 
 
-hslaToVector : Hsla -> HslaVector
-hslaToVector hsla =
-    { x = Basics.cos (hsla.hue / 180 * Basics.pi) * hsla.saturation
-    , y = Basics.sin (hsla.hue / 180 * Basics.pi) * hsla.saturation
-    , z = hsla.lightness
+hslaToVector : Hsla -> Float -> HslaVector
+hslaToVector hsla strength =
+    { x = Basics.cos (radiansToHue hsla.hue / 180 * Basics.pi) * hsla.saturation * strength
+    , y = Basics.sin (radiansToHue hsla.hue / 180 * Basics.pi) * hsla.saturation * strength
+    , z = hsla.lightness * strength
     , a = hsla.alpha
     }
 
@@ -105,6 +105,16 @@ addDicts dict1 dict2 =
         )
         dict1
         dict2
+
+
+hueToRadians : Float -> Float
+hueToRadians hue =
+    hue / 360
+
+
+radiansToHue : Float -> Float
+radiansToHue radians =
+    radians * 360
 
 
 combineDicts : Dict comparable b -> Dict comparable b -> Dict comparable b

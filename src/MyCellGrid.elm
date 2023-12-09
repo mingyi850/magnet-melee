@@ -148,7 +148,7 @@ renderCell style position value =
         , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
         , Svg.Attributes.fill (toCssString (style.toCellColor value))
         , Svg.Attributes.stroke (toCssString style.gridLineColor)
-        , Svg.Attributes.fillOpacity (style.toCellOpacity value |> String.fromFloat)
+        , Svg.Attributes.fillOpacity "1" --(style.toCellOpacity value |> String.fromFloat)
         , Mouse.onDown (onMouseDown position)
         , Mouse.onOver
             (\r ->
