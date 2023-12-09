@@ -27,11 +27,12 @@ import MyCellGrid exposing (InteractionType(..), Msg)
 import Process
 import Random exposing (..)
 import Round exposing (..)
+import Settings exposing (..)
+import SettingsComponents exposing (..)
 import Svg exposing (..)
 import Svg.Attributes
 import Task
 import Utils exposing (..)
-import VariableSettings as Settings exposing (..)
 
 
 
@@ -351,15 +352,15 @@ updateGameBoardMagneticField game =
     { game | board = updateBoardMagneticField game.magnetism game.board }
 
 
-updateGameBoard : Int -> Game -> Game
-updateGameBoard magnitude game =
+updateGameBoard : Float -> Game -> Game
+updateGameBoard friction game =
     let
         gameScores =
             getGameScore game
 
         newGame =
             { game
-                | board = updateBoardMagneticField game.magnetism (updatePiecePositions magnitude game.board)
+                | board = updateBoardMagneticField game.magnetism (updatePiecePositions friction game.board)
                 , players = updatePlayerScores game.players gameScores
             }
     in
@@ -459,9 +460,12 @@ update msg game =
         UpdateBoard previousStates ->
             let
                 previousStatesCount =
-                    List.length (List.filter (\board -> board == game.board) previousStates)
+                    toFloat (List.length previousStates)
+
+                previousSameStatesCount =
+                    toFloat (List.length (List.filter (\board -> board == game.board) previousStates))
             in
-            updateGameBoard (previousStatesCount + 1) game
+            updateGameBoard (1 + previousStatesCount) game
                 |> withDetermineUpdateCommand game previousStates
 
         GenerateAIMove num ->
@@ -609,50 +613,6 @@ getBoardView game =
         )
 
 
-type alias GamePickChoiceOptionButton =
-    { label : String
-    , onSelect : Msg
-    , isSelected : Bool
-    }
-
-
-type alias GamePickChoiceButtonsConfig =
-    { label : String
-    , options : List GamePickChoiceOptionButton
-    }
-
-
-polarityPickChoiceConfig : Int -> Game -> GamePickChoiceButtonsConfig
-polarityPickChoiceConfig player game =
-    { label = "Player Polarity"
-    , options =
-        [ { label = "+", onSelect = UpdatePlayerPolarity player Positive, isSelected = getPlayerPolarity player game == Positive }
-        , { label = "-", onSelect = UpdatePlayerPolarity player Negative, isSelected = getPlayerPolarity player game == Negative }
-        ]
-    }
-
-
-viewPolaritySelector : Game -> GamePickChoiceButtonsConfig -> Html Msg
-viewPolaritySelector game data =
-    div [ class "setting-picker-item" ]
-        [ label [ id "polarity-picker-label", class "setting-picker-item-label", Html.Attributes.style "font-size" (px (20 - (2 * Dict.size game.players))) ] [ Html.text data.label ]
-        , div [ class "setting-picker-item-input setting-picker-item-input-buttons" ]
-            (List.map
-                (\{ label, onSelect, isSelected } ->
-                    button
-                        [ id "polarity-label"
-                        , class ("setting-picker-item-button setting-picker-item-button-" ++ String.replace " " "-" label)
-                        , classList [ ( "selected", isSelected ) ]
-                        , onClick onSelect
-                        , Html.Attributes.style "font-size" (px (30 - (3 * Dict.size game.players)))
-                        ]
-                        [ Html.text label ]
-                )
-                data.options
-            )
-        ]
-
-
 polarityPickChoiceConfig2 : Int -> Game -> PickChoiceButtonsConfig Msg
 polarityPickChoiceConfig2 player game =
     { label = "Player Polarity"
@@ -663,8 +623,8 @@ polarityPickChoiceConfig2 player game =
     }
 
 
-viewPolaritySelector2 : Game -> PickChoiceButtonsConfig Msg -> Html Msg
-viewPolaritySelector2 game data =
+viewPolaritySelector : Game -> PickChoiceButtonsConfig Msg -> Html Msg
+viewPolaritySelector game data =
     viewPickerItem [ Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
 
 
@@ -750,8 +710,7 @@ playerContainer playerNum player game =
     div [ id "player-info", class "player-container" ]
         [ playerNumContainer game playerNum
         , div [ class "player-moves-container", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
-        , viewPolaritySelector game (polarityPickChoiceConfig playerNum game)
-        , viewPolaritySelector2 game (polarityPickChoiceConfig2 playerNum game)
+        , viewPolaritySelector game (polarityPickChoiceConfig2 playerNum game)
 
         --, div [ class "player-polarity-container" ] [ div [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
         , div [ class "player-score-box" ]

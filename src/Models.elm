@@ -481,17 +481,17 @@ updateBoardMagneticField magnetism board =
     }
 
 
-updatePiecePositions : Int -> Board -> Board
-updatePiecePositions magnitude board =
+updatePiecePositions : Float -> Board -> Board
+updatePiecePositions friction board =
     let
         coordinatePieces =
             Dict.values (Dict.map (\coordinate index -> ( coordinate, index, Dict.get index board.pieces )) board.coordinatePieces)
     in
-    updatePiecePositionsRecursive magnitude coordinatePieces board.magneticField board
+    updatePiecePositionsRecursive friction coordinatePieces board.magneticField board
 
 
-updatePiecePositionsRecursive : Int -> List ( ( Int, Int ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
-updatePiecePositionsRecursive magnitude coordinatePieces magneticFields board =
+updatePiecePositionsRecursive : Float -> List ( ( Int, Int ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
+updatePiecePositionsRecursive friction coordinatePieces magneticFields board =
     case coordinatePieces of
         [] ->
             board
@@ -510,27 +510,27 @@ updatePiecePositionsRecursive magnitude coordinatePieces magneticFields board =
                         Just f ->
                             let
                                 movementVector =
-                                    scaledIntUnit magnitude (getMovementVectorForMagnet 1 (toFloat magnitude) f p)
+                                    unitIntVector (getMovementVectorForMagnet friction friction f p)
                             in
-                            updatePiecePositionsRecursive magnitude rest magneticFields (movePiece board pieceIndex movementVector)
+                            updatePiecePositionsRecursive friction rest magneticFields (movePiece board pieceIndex movementVector)
 
                         Nothing ->
-                            updatePiecePositionsRecursive magnitude rest magneticFields board
+                            updatePiecePositionsRecursive friction rest magneticFields board
 
                 Nothing ->
-                    updatePiecePositionsRecursive magnitude rest magneticFields board
+                    updatePiecePositionsRecursive friction rest magneticFields board
 
 
 getMovementVectorForMagnet : Float -> Float -> MagneticField -> Piece -> IntVector
-getMovementVectorForMagnet threshold magnitude field piece =
+getMovementVectorForMagnet friction magnitude field piece =
     let
         resultantVector =
             case piece.polarity of
                 Positive ->
-                    multiplyVector magnitude (combineVectors field.positiveVector (negative field.negativeVector))
+                    combineVectors field.positiveVector (negative field.negativeVector)
 
                 Negative ->
-                    multiplyVector magnitude (combineVectors field.negativeVector (negative field.positiveVector))
+                    combineVectors field.negativeVector (negative field.positiveVector)
 
                 None ->
                     { x = 0, y = 0 }
@@ -542,14 +542,14 @@ getMovementVectorForMagnet threshold magnitude field piece =
             abs resultantVector.y
 
         resultantX =
-            if xMagnitude > threshold then
+            if xMagnitude > friction then
                 round resultantVector.x
 
             else
                 0
 
         resultantY =
-            if yMagnitude > threshold then
+            if yMagnitude > friction then
                 round resultantVector.y
 
             else
@@ -879,17 +879,6 @@ getPieceColorFromContent content =
             Color.white
 
 
-getMergedCellColor : List PlayerColor -> Color.Color
-getMergedCellColor players =
-    case players of
-        [] ->
-            Color.white
-
-        playerColors ->
-            blendRGB (List.map playerColorToRGB playerColors)
-                |> colorFromTuple
-
-
 getTextFromContent : CellContent -> String
 getTextFromContent content =
     case content of
@@ -916,7 +905,7 @@ cellStyle magnetism board =
     , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
     , gridLineColor = Color.rgb 0 0 0
     , gridLineWidth = 0 --toFloat (board.config.displaySize // board.config.gridDimensions) / 20
-    , pieceLineWidth = toFloat (board.config.displaySize // board.config.gridDimensions) / 5
+    , pieceLineWidth = toFloat (board.config.displaySize // board.config.gridDimensions) / 10
     , shouldRenderPiece =
         \content ->
             case content of
