@@ -1078,24 +1078,30 @@ movePieceCoordinate coordinate vector =
     { x = coordinate.x + toFloat vector.x, y = coordinate.y + toFloat vector.y }
 
 
-getMaxMovementCoordinate : Int -> Board -> BoardCoordinate -> IntVector -> BoardCoordinate
-getMaxMovementCoordinate pieceIndex board coordinate vector =
+getMaxMovementCoordinate : Int -> Board -> BoardCoordinate -> IntVector -> IntVector -> BoardCoordinate
+getMaxMovementCoordinate pieceIndex board coordinate vector prevVector =
     let
         unitVector =
             unitIntVector vector
 
         tentativeNext =
-            movePieceCoordinate coordinate (unitIntVector vector)
+            movePieceCoordinate coordinate (unitIntVector prevVector)
 
         tentativeNextPiece =
             getPieceFromCoordinate board tentativeNext
+
+        actualNext =
+            movePieceCoordinate coordinate unitVector
     in
     case tentativeNextPiece of
         Just _ ->
-            movePieceCoordinate coordinate (negativeIntVec unitVector)
+            Debug.log ("Max movement coordinate: found next piece at tentativeNext" ++ toString tentativeNext ++ "original" ++ toString prevVector ++ "will move in dir" ++ toString (negativeIntVec prevVector))
+                movePieceCoordinate
+                coordinate
+                (negativeIntVec (unitIntVector prevVector))
 
         Nothing ->
-            getMaxMovementCoordinate pieceIndex (movePieceUnsafe board pieceIndex unitVector) tentativeNext (decreaseIntVectorMagnitude vector)
+            getMaxMovementCoordinate pieceIndex (movePieceUnsafe board pieceIndex unitVector) actualNext (decreaseIntVectorMagnitude vector) vector
 
 
 movePieceUnsafe : Board -> Int -> IntVector -> Board
@@ -1134,8 +1140,11 @@ movePiece board pieceIndex vector =
     case pieceCoordinate of
         Just coordinate ->
             let
+                log =
+                    Debug.log ("Moving piece " ++ toString pieceIndex ++ " from " ++ toString coordinate ++ " in direction " ++ toString vector) 1
+
                 newCoordinate =
-                    getMaxMovementCoordinate pieceIndex board coordinate vector
+                    getMaxMovementCoordinate pieceIndex board coordinate vector vector
 
                 newCoordinateOnMap =
                     coordinateOnMap newCoordinate board
