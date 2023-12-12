@@ -347,11 +347,6 @@ updatePlayerScores players scoreDict =
         players
 
 
-updateGameBoardMagneticField : Game -> Game
-updateGameBoardMagneticField game =
-    { game | board = updateBoardMagneticField game.magnetism game.board }
-
-
 updateGameBoard : Float -> Game -> Game
 updateGameBoard friction game =
     let
@@ -360,17 +355,18 @@ updateGameBoard friction game =
 
         newGame =
             { game
-                | board = updateBoardMagneticField game.magnetism (updatePiecePositions friction game.board)
+                | board = updateBoardMagneticField game.magnetism (updatePiecePositions2 friction (updatePieceVelocities game.magnetism game.board))
                 , players = updatePlayerScores game.players gameScores
             }
     in
+    --if newGame.board.pieceCoordinates == game.board.pieceCoordinates then
     if newGame.board.pieceCoordinates == game.board.pieceCoordinates then
         case game.status of
             Processing ->
-                { newGame | status = getGameStatus game }
+                { newGame | status = getGameStatus game, board = zeroPieceVelocities newGame.board }
 
             _ ->
-                newGame
+                { newGame | board = zeroPieceVelocities newGame.board }
         -- No more changes, stop sending update message
 
     else

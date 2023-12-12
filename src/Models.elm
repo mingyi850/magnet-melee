@@ -10,6 +10,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import MyCellGrid exposing (..)
+import Set exposing (..)
 import Utils exposing (..)
 import VectorUtils exposing (..)
 
@@ -95,6 +96,7 @@ type alias Board =
     , tentativePieces : Dict Int Piece
     , tentativePieceCoordinates : Dict Int BoardCoordinate
     , tentativeCoordinatePieces : Dict ( Float, Float ) Int
+    , pieceVelocities : Dict Int FloatVector
     }
 
 
@@ -176,8 +178,6 @@ playerColorToHslaBoard2 : Int -> PlayerColor -> Float -> Float -> Float -> Hsla
 playerColorToHslaBoard2 totalPieces playerColor strength totalStrength gameMagnetism =
     case playerColor of
         Red ->
-            --Debug.log
-            --    (toString strength ++ " " ++ toString totalPieces ++ " " ++ toString gameMagnetism)
             { hue = hueToRadians 0, saturation = 1, lightness = 0.75 - (0.5 * Basics.sqrt (strength / toFloat totalPieces / gameMagnetism)), alpha = 0.9 }
 
         Blue ->
@@ -361,6 +361,7 @@ emptyBoard boardConfig =
     , tentativePieces = Dict.empty
     , tentativePieceCoordinates = Dict.empty
     , tentativeCoordinatePieces = Dict.empty
+    , pieceVelocities = Dict.empty
     }
 
 
@@ -382,6 +383,21 @@ getTentativePieceFromCoordinate board coordinate =
                 |> Dict.get (coordinateToTuple coordinate)
     in
     Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
+
+
+combineMaybeVectors : FloatVector -> Maybe FloatVector -> FloatVector
+combineMaybeVectors vector maybeVector =
+    case maybeVector of
+        Just v ->
+            combineVectors vector v
+
+        Nothing ->
+            vector
+
+
+updateForceDict : Dict Int FloatVector -> Dict Int FloatVector -> Dict Int FloatVector
+updateForceDict forceDict newForceDict =
+    Dict.foldl (\player force accumDict -> Dict.insert player (combineMaybeVectors force (Dict.get player accumDict)) accumDict) forceDict newForceDict
 
 
 
@@ -446,7 +462,7 @@ getBoardMagneticFieldRec board magnetism remainingCoordinates magneticFields =
             getBoardMagneticFieldRec board magnetism rest (Dict.insert (intCoordinateToTuple coordinate) currentField magneticFields)
 
 
-getCoordinatePieces : Board -> List ( BoardCoordinate, Piece )
+getCoordinatePieces : Board -> List ( Int, BoardCoordinate, Piece )
 getCoordinatePieces board =
     let
         allPieces =
@@ -460,7 +476,7 @@ getCoordinatePieces board =
             (\( coordinate, pieceIndex ) ->
                 case Dict.get pieceIndex allPieces of
                     Just piece ->
-                        Just ( coordinateFromTuple coordinate, piece )
+                        Just ( pieceIndex, coordinateFromTuple coordinate, piece )
 
                     Nothing ->
                         Nothing
@@ -474,11 +490,38 @@ getMagneticFieldForCoordinate board magnetism coordinate =
             getCoordinatePieces board
     in
     List.foldl
-        (\( coord, piece ) existingFields ->
+        (\( _, coord, piece ) existingFields ->
             mergeMagneticFields existingFields (getFieldFromPieceAtCoordinate magnetism coordinate coord piece)
         )
         emptyMagneticField
         coordinatePieces
+
+
+calculateForceVector : Int -> BoardCoordinate -> BoardCoordinate -> ( FloatVector, Float )
+calculateForceVector magnetism coordinate pieceCoordinate =
+    let
+        eDistance =
+            euclideanDistance coordinate pieceCoordinate
+
+        distanceVector =
+            { x = coordinate.x - pieceCoordinate.x, y = coordinate.y - pieceCoordinate.y }
+
+        distanceVectorSum =
+            abs distanceVector.x + abs distanceVector.y
+
+        magnetStrength =
+            if eDistance == 0 then
+                0
+
+            else
+                toFloat magnetism / (eDistance ^ 2)
+
+        resultantVector =
+            { x = distanceVector.x * magnetStrength / distanceVectorSum
+            , y = distanceVector.y * magnetStrength / distanceVectorSum
+            }
+    in
+    ( resultantVector, magnetStrength )
 
 
 getFieldFromPieceAtCoordinate : Int -> IntCoordinate -> BoardCoordinate -> Piece -> MagneticField
@@ -491,26 +534,8 @@ getFieldFromPieceAtCoordinate magnetism coordinate pieceCoordinate piece =
             floatCoordinate =
                 intCoordinateToFloat coordinate
 
-            eDistance =
-                euclideanDistance floatCoordinate pieceCoordinate
-
-            distanceVector =
-                { x = floatCoordinate.x - pieceCoordinate.x, y = floatCoordinate.y - pieceCoordinate.y }
-
-            distanceVectorSum =
-                abs distanceVector.x + abs distanceVector.y
-
-            magnetStrength =
-                if eDistance == 0 then
-                    0
-
-                else
-                    toFloat magnetism / (eDistance ^ 2)
-
-            resultantVector =
-                { x = distanceVector.x * magnetStrength / distanceVectorSum
-                , y = distanceVector.y * magnetStrength / distanceVectorSum
-                }
+            ( resultantVector, magnetStrength ) =
+                calculateForceVector magnetism floatCoordinate pieceCoordinate
         in
         case piece.polarity of
             Positive ->
@@ -537,6 +562,15 @@ updatePiecePositions friction board =
             Dict.values (Dict.map (\coordinate index -> ( coordinate, index, Dict.get index board.pieces )) board.coordinatePieces)
     in
     updatePiecePositionsRecursive friction coordinatePieces board.magneticField board
+
+
+updatePiecePositions2 : Float -> Board -> Board
+updatePiecePositions2 friction board =
+    let
+        coordinatePieces =
+            Dict.values (Dict.map (\coordinate index -> ( coordinate, index, Dict.get index board.pieces )) board.coordinatePieces)
+    in
+    updatePiecePositionsRecursive2 friction coordinatePieces board
 
 
 updatePiecePositionsRecursive : Float -> List ( ( Float, Float ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
@@ -568,6 +602,397 @@ updatePiecePositionsRecursive friction coordinatePieces magneticFields board =
 
                 Nothing ->
                     updatePiecePositionsRecursive friction rest magneticFields board
+
+
+updatePiecePositionsRecursive2 : Float -> List ( ( Float, Float ), Int, Maybe Piece ) -> Board -> Board
+updatePiecePositionsRecursive2 friction coordinatePieces board =
+    case coordinatePieces of
+        [] ->
+            board
+
+        coordinatePiece :: rest ->
+            let
+                ( coordinate, pieceIndex, piece ) =
+                    coordinatePiece
+
+                velocity =
+                    Dict.get pieceIndex board.pieceVelocities
+            in
+            case piece of
+                Just p ->
+                    case velocity of
+                        Just f ->
+                            let
+                                movementVector =
+                                    floatCoordinateToInt (multiplyVector 0.01 f)
+                            in
+                            updatePiecePositionsRecursive2 friction rest (movePiece board pieceIndex movementVector)
+
+                        Nothing ->
+                            updatePiecePositionsRecursive2 friction rest board
+
+                Nothing ->
+                    updatePiecePositionsRecursive2 friction rest board
+
+
+getFrictionVector : Float -> FloatVector -> FloatVector
+getFrictionVector friction vector =
+    let
+        xMagnitude =
+            abs vector.x
+
+        yMagnitude =
+            abs vector.y
+
+        totalMagnitude =
+            xMagnitude + yMagnitude
+
+        xFriction =
+            friction * xMagnitude
+
+        yFriction =
+            friction * yMagnitude
+
+        xSign =
+            if vector.x < 0 then
+                1
+
+            else
+                -1
+
+        ySign =
+            if vector.y < 0 then
+                1
+
+            else
+                -1
+    in
+    { x = xFriction * xSign, y = yFriction * ySign }
+
+
+updatePieceCollisions : Board -> Board
+updatePieceCollisions board =
+    let
+        updates =
+            getCollidingPieceUpdates2 board board.pieceVelocities
+
+        log2 =
+            Debug.log ("updates" ++ toString updates) 1
+
+        newPieceVelocities =
+            updateForceDict board.pieceVelocities updates
+
+        log =
+            Debug.log ("afterCollision" ++ toString newPieceVelocities) 1
+    in
+    { board
+        | pieceVelocities = newPieceVelocities
+    }
+
+
+checkAllVectorStop : Board -> Board
+checkAllVectorStop board =
+    let
+        newPieceVelocities =
+            Dict.map (\i v -> checkVectorStop v) board.pieceVelocities
+    in
+    { board
+        | pieceVelocities = newPieceVelocities
+    }
+
+
+checkVectorStop : FloatVector -> FloatVector
+checkVectorStop vector =
+    if sqrt (vector.x ^ 2 + vector.y ^ 2) < 50 then
+        { x = 0, y = 0 }
+
+    else
+        vector
+
+
+updatePieceVelocities : Int -> Board -> Board
+updatePieceVelocities magnetism board =
+    let
+        friction =
+            0.4
+
+        magneticForceDict =
+            getMagneticForceOnAllPieces magnetism board
+
+        log =
+            Debug.log ("magneticForceDict" ++ toString magneticForceDict) 1
+
+        newVelocities =
+            updateForceDict board.pieceVelocities magneticForceDict
+
+        log2 =
+            Debug.log ("newVelocities" ++ toString newVelocities) 1
+
+        newVelocitiesWithFriction =
+            Dict.map
+                (\index vector -> combineVectors (getFrictionVector friction vector) vector)
+                newVelocities
+
+        log3 =
+            Debug.log ("newVelocitiesAfterFriction" ++ toString newVelocitiesWithFriction) 1
+    in
+    { board
+        | pieceVelocities = newVelocitiesWithFriction
+    }
+        |> updatePieceCollisions
+        |> checkAllVectorStop
+
+
+zeroPieceVelocities : Board -> Board
+zeroPieceVelocities board =
+    { board
+        | pieceVelocities = Dict.map (\i v -> { x = 0, y = 0 }) board.pieceVelocities
+    }
+
+
+
+{- getCollidingPieceUpdates : Board -> Float -> Dict Int FloatVector -> Dict Int FloatVector
+   getCollidingPieceUpdates board friction velocities =
+       let
+           collidingPieces =
+               getCollidingPieces board
+
+           velocitesAfterCollision =
+               List.foldl
+                   (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) accumDict ->
+                       let
+                           relativePosition =
+                               { x = coord1.x - coord2.x, y = coord1.y - coord2.y }
+
+                           resultantDict =
+                               case Dict.get i1 velocities of
+                                   Just v1 ->
+                                       case Dict.get i2 velocities of
+                                           Just v2 ->
+                                               Dict.fromList [ ( i1, v2 ), ( i2, v1 ) ]
+
+                                           Nothing ->
+                                               Dict.empty
+
+                                   Nothing ->
+                                       Dict.empty
+                       in
+                       updateForceDict accumDict resultantDict
+                   )
+                   velocities
+                   collidingPieces
+
+           collidedPieces =
+               getCollidedPiecesFromPairs collidingPieces
+
+           velocitiesAfterFriction =
+               Dict.map
+                   (\index vector ->
+                       if Set.member index collidedPieces then
+                           combineVectors (getFrictionVector friction vector) vector
+
+                       else
+                           vector
+                   )
+                   velocitesAfterCollision
+       in
+       velocitiesAfterFriction
+-}
+
+
+getCollidingPieceUpdates : Board -> Float -> Dict Int FloatVector -> Dict Int FloatVector
+getCollidingPieceUpdates board friction velocities =
+    let
+        collidingPieces =
+            getCollidingPieces board
+
+        velocitiesAfterCollision =
+            List.foldl
+                (\( ( i1, _, _ ), ( i2, _, _ ) ) accumDict ->
+                    case ( Dict.get i1 velocities, Dict.get i2 velocities ) of
+                        ( Just v1, Just v2 ) ->
+                            let
+                                averageVelocity =
+                                    { x = (v1.x + v2.x) / 2, y = (v1.y + v2.y) / 2 }
+                            in
+                            accumDict
+                                |> Dict.insert i1 averageVelocity
+                                |> Dict.insert i2 averageVelocity
+
+                        _ ->
+                            accumDict
+                )
+                velocities
+                collidingPieces
+
+        collidedPieces =
+            getCollidedPiecesFromPairs collidingPieces
+
+        velocitiesAfterFriction =
+            Dict.map
+                (\index vector ->
+                    if Set.member index collidedPieces then
+                        combineVectors (getFrictionVector friction vector) vector
+
+                    else
+                        vector
+                )
+                velocitiesAfterCollision
+    in
+    velocitiesAfterFriction
+
+
+getCollidingPieceUpdates2 : Board -> Dict Int FloatVector -> Dict Int FloatVector
+getCollidingPieceUpdates2 board velocities =
+    let
+        collidingPieces =
+            getCollidingPieces board
+
+        velocitiesAfterCollision =
+            List.foldl
+                (\( ( i1, c1, _ ), ( i2, c2, _ ) ) accumDict ->
+                    case ( Dict.get i1 velocities, Dict.get i2 velocities ) of
+                        ( Just v1, Just v2 ) ->
+                            let
+                                proportion =
+                                    vectorMagnitude v1 / (vectorMagnitude v1 + vectorMagnitude v2)
+
+                                impulse =
+                                    calculateImpulse 1 v1 v2 (calculateCollisionNormal c1 c2)
+
+                                antiV1 =
+                                    multiplyVector proportion impulse
+
+                                antiV2 =
+                                    multiplyVector (1 - proportion) (negative impulse)
+
+                                log =
+                                    Debug.log ("Impulse for " ++ toString c1 ++ toString c2 ++ toString impulse ++ "proportion" ++ toString proportion ++ "antiV1" ++ toString antiV1 ++ "antiV2" ++ toString antiV2) 1
+                            in
+                            updateForceDict (Dict.fromList [ ( i1, antiV1 ), ( i2, antiV2 ) ]) accumDict
+
+                        _ ->
+                            accumDict
+                )
+                Dict.empty
+                collidingPieces
+    in
+    velocitiesAfterCollision
+
+
+calculateImpulse : Float -> FloatVector -> FloatVector -> FloatVector -> FloatVector
+calculateImpulse restitution velocity1 velocity2 collisionNormal =
+    let
+        relativeVelocity =
+            { x = velocity1.x - velocity2.x, y = velocity1.y - velocity2.y }
+
+        velocityScaleAlongNormal =
+            relativeVelocity.x * collisionNormal.x + relativeVelocity.y * collisionNormal.y
+
+        velocityAlongNormalVector =
+            { x = restitution * velocityScaleAlongNormal * collisionNormal.x, y = restitution * velocityScaleAlongNormal * collisionNormal.y }
+
+        impulse =
+            if velocityScaleAlongNormal > 0 then
+                negative velocityAlongNormalVector
+                --{ x = -restitution * relativeVelocity.x, y = -restitution * relativeVelocity.y }
+
+            else
+                { x = 0, y = 0 }
+    in
+    impulse
+
+
+calculateCollisionNormal : BoardCoordinate -> BoardCoordinate -> FloatVector
+calculateCollisionNormal position1 position2 =
+    let
+        directionVector =
+            { x = position2.x - position1.x, y = position2.y - position1.y }
+
+        magnitude =
+            sqrt (directionVector.x ^ 2 + directionVector.y ^ 2)
+
+        collisionNormal =
+            { x = directionVector.x / magnitude, y = directionVector.y / magnitude }
+    in
+    collisionNormal
+
+
+getCollidedPiecesFromPairs : List ( ( Int, BoardCoordinate, Piece ), ( Int, BoardCoordinate, Piece ) ) -> Set Int
+getCollidedPiecesFromPairs pairs =
+    List.foldl
+        (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) accum ->
+            [ i1, i2 ] ++ accum
+        )
+        []
+        pairs
+        |> Set.fromList
+
+
+getCollidingPieces : Board -> List ( ( Int, BoardCoordinate, Piece ), ( Int, BoardCoordinate, Piece ) )
+getCollidingPieces board =
+    let
+        coordinatePieces =
+            getCoordinatePieces board
+
+        coordinatePairs =
+            getPairs coordinatePieces
+    in
+    List.filter
+        (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) ->
+            let
+                distance =
+                    euclideanDistance coord1 coord2
+            in
+            distance <= 2
+        )
+        coordinatePairs
+
+
+getMagneticForceOnAllPieces : Int -> Board -> Dict Int FloatVector
+getMagneticForceOnAllPieces magnetism board =
+    let
+        coordinatePieces =
+            getCoordinatePieces board
+
+        coordinatePiecesWithoutTentative =
+            List.filter (\( index, _, _ ) -> not (Dict.member index board.tentativePieces)) coordinatePieces
+
+        coordinatePairs =
+            getPairs coordinatePiecesWithoutTentative
+    in
+    List.foldl
+        (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) accumDict ->
+            let
+                force =
+                    getMagneticForceBetweenPieces magnetism coord1 piece1 coord2 piece2
+
+                resultantDict =
+                    Dict.fromList [ ( i1, force ), ( i2, negative force ) ]
+            in
+            updateForceDict accumDict resultantDict
+        )
+        Dict.empty
+        coordinatePairs
+
+
+getMagneticForceBetweenPieces : Int -> BoardCoordinate -> Piece -> BoardCoordinate -> Piece -> FloatVector
+getMagneticForceBetweenPieces magnetism coordinate1 piece1 coordinate2 piece2 =
+    let
+        ( force, totalStrength ) =
+            calculateForceVector magnetism coordinate1 coordinate2
+    in
+    if piece1.polarity == piece2.polarity then
+        force
+        {- else if
+               euclideanDistance coordinate1 coordinate2 <= 2
+               --pieces are touching, negate attraction forces
+           then
+               { x = 0, y = 0 }
+        -}
+
+    else
+        negative force
 
 
 getMovementVectorForMagnet : Float -> Float -> MagneticField -> Piece -> IntVector
@@ -667,7 +1092,7 @@ getMaxMovementCoordinate pieceIndex board coordinate vector =
     in
     case tentativeNextPiece of
         Just _ ->
-            coordinate
+            movePieceCoordinate coordinate (negativeIntVec unitVector)
 
         Nothing ->
             getMaxMovementCoordinate pieceIndex (movePieceUnsafe board pieceIndex unitVector) tentativeNext (decreaseIntVectorMagnitude vector)
@@ -727,6 +1152,8 @@ movePiece board pieceIndex vector =
                     | pieceCoordinates = Dict.remove pieceIndex board.pieceCoordinates
                     , coordinatePieces =
                         Dict.remove (coordinateToTuple coordinate) board.coordinatePieces
+                    , pieces = Dict.remove pieceIndex board.pieces
+                    , pieceVelocities = Dict.remove pieceIndex board.pieceVelocities
                 }
 
         Nothing ->

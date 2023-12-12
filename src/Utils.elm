@@ -165,3 +165,15 @@ px x =
 pc : Int -> String
 pc x =
     String.fromInt x ++ "%"
+
+
+getPairs : List a -> List ( a, a )
+getPairs list =
+    list
+        |> List.indexedMap Tuple.pair
+        |> List.concatMap
+            (\( i, x ) ->
+                list
+                    |> List.drop (i + 1)
+                    |> List.map (\y -> ( x, y ))
+            )

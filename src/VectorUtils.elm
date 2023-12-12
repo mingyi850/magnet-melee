@@ -18,6 +18,21 @@ negative vector =
     { x = -vector.x, y = -vector.y }
 
 
+negativeIntVec : IntVector -> IntVector
+negativeIntVec vector =
+    { x = -vector.x, y = -vector.y }
+
+
+addFloatVectors : FloatVector -> FloatVector -> FloatVector
+addFloatVectors vector1 vector2 =
+    { x = vector1.x + vector2.x, y = vector1.y + vector2.y }
+
+
+vectorMagnitude : FloatVector -> Float
+vectorMagnitude vector =
+    sqrt (vector.x * vector.x + vector.y * vector.y)
+
+
 unit : FloatVector -> IntVector
 unit vector =
     let
