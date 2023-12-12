@@ -375,6 +375,33 @@ getPieceFromCoordinate board coordinate =
     Maybe.andThen (\index -> Dict.get index board.pieces) pieceIndex
 
 
+checkValidPiecePlacement : BoardCoordinate -> Board -> Bool
+checkValidPiecePlacement coordinate board =
+    let
+        checkedCoordinates =
+            getSurroundingCoordinates coordinate
+    in
+    List.filterMap (\coord -> getPieceFromCoordinate board coord) checkedCoordinates
+        |> List.isEmpty
+
+
+getSurroundingCoordinates : BoardCoordinate -> List BoardCoordinate
+getSurroundingCoordinates coordinate =
+    let
+        x =
+            coordinate.x
+
+        y =
+            coordinate.y
+    in
+    [ { x = x, y = y }
+    , { x = x - 1, y = y }
+    , { x = x, y = y - 1 }
+    , { x = x, y = y + 1 }
+    , { x = x + 1, y = y }
+    ]
+
+
 getTentativePieceFromCoordinate : Board -> BoardCoordinate -> Maybe Piece
 getTentativePieceFromCoordinate board coordinate =
     let

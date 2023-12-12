@@ -192,28 +192,26 @@ applyMove move game =
             { status = Success, game = updatePlayerPolarity player polarity game }
 
         PlacePiece coordinate polarity ->
-            case getPieceFromCoordinate game.board (intCoordinateToFloat coordinate) of
-                Just piece ->
-                    { status = Failure, game = game }
-
-                Nothing ->
-                    { status = Success
-                    , game =
-                        { game
-                            | board =
-                                removeTentativePieces game.board
-                                    |> insertPiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate)
-                                    |> updateBoardMagneticField game.magnetism
-                        }
+            if checkValidPiecePlacement (intCoordinateToFloat coordinate) game.board then
+                { status = Success
+                , game =
+                    { game
+                        | board =
+                            removeTentativePieces game.board
+                                |> insertPiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate)
+                                |> updateBoardMagneticField game.magnetism
                     }
+                }
+
+            else
+                { status = Failure, game = game }
 
         DisplayPiece coordinate polarity ->
-            case getPieceFromCoordinate game.board (intCoordinateToFloat coordinate) of
-                Just piece ->
-                    { status = Failure, game = game }
+            if checkValidPiecePlacement (intCoordinateToFloat coordinate) game.board then
+                { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate) game.board |> updateBoardMagneticField game.magnetism } }
 
-                Nothing ->
-                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate) game.board |> updateBoardMagneticField game.magnetism } }
+            else
+                { status = Failure, game = game }
 
 
 generateRandomMove : Game -> RandomMove
