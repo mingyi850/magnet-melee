@@ -89,22 +89,22 @@ type alias Piece =
 type alias Board =
     { pieces : Dict Int Piece
     , pieceCoordinates : Dict Int BoardCoordinate
-    , coordinatePieces : Dict ( Int, Int ) Int
+    , coordinatePieces : Dict ( Float, Float ) Int
     , magneticField : Dict ( Int, Int ) MagneticField
     , config : BoardConfig
     , tentativePieces : Dict Int Piece
     , tentativePieceCoordinates : Dict Int BoardCoordinate
-    , tentativeCoordinatePieces : Dict ( Int, Int ) Int
+    , tentativeCoordinatePieces : Dict ( Float, Float ) Int
     }
 
 
-type alias FloatCoordinate =
+type alias BoardCoordinate =
     { x : Float
     , y : Float
     }
 
 
-type alias BoardCoordinate =
+type alias IntCoordinate =
     { x : Int
     , y : Int
     }
@@ -289,34 +289,64 @@ toPolarityIcon polarity =
             ""
 
 
-toTuple : BoardCoordinate -> ( Int, Int )
-toTuple coordinate =
+coordinateToTuple : BoardCoordinate -> ( Float, Float )
+coordinateToTuple coordinate =
     ( coordinate.x, coordinate.y )
 
 
-fromTuple : ( Int, Int ) -> BoardCoordinate
-fromTuple ( x, y ) =
+intCoordinateToTuple : IntCoordinate -> ( Int, Int )
+intCoordinateToTuple coordinate =
+    ( coordinate.x, coordinate.y )
+
+
+coordinateFromTuple : ( Float, Float ) -> BoardCoordinate
+coordinateFromTuple ( x, y ) =
     { x = x, y = y }
 
 
-fromArgs : Int -> Int -> BoardCoordinate
+intCoordinateFromTuple : ( Int, Int ) -> IntCoordinate
+intCoordinateFromTuple ( x, y ) =
+    { x = x, y = y }
+
+
+intCoordinateToFloat : IntCoordinate -> BoardCoordinate
+intCoordinateToFloat { x, y } =
+    { x = toFloat x, y = toFloat y }
+
+
+floatCoordinateToInt : BoardCoordinate -> IntCoordinate
+floatCoordinateToInt { x, y } =
+    { x = round x, y = round y }
+
+
+fromArgs : Float -> Float -> BoardCoordinate
 fromArgs x y =
     { x = x, y = y }
 
 
+roundTuple : ( Float, Float ) -> ( Int, Int )
+roundTuple ( x, y ) =
+    ( round x, round y )
+
+
+tupleToFloat : ( Int, Int ) -> ( Float, Float )
+tupleToFloat ( x, y ) =
+    ( toFloat x, toFloat y )
+
+
 coordinateToString : BoardCoordinate -> String
 coordinateToString coordinate =
-    "(" ++ String.fromInt coordinate.x ++ "," ++ String.fromInt coordinate.y ++ ")"
+    "(" ++ String.fromFloat coordinate.x ++ "," ++ String.fromFloat coordinate.y ++ ")"
 
 
 euclideanDistance : BoardCoordinate -> BoardCoordinate -> Float
 euclideanDistance coordinate1 coordinate2 =
     let
         xDiff =
-            toFloat (coordinate1.x - coordinate2.x)
+            coordinate1.x - coordinate2.x
 
         yDiff =
-            toFloat (coordinate1.y - coordinate2.y)
+            coordinate1.y - coordinate2.y
     in
     Basics.sqrt (xDiff ^ 2 + yDiff ^ 2)
 
@@ -339,7 +369,7 @@ getPieceFromCoordinate board coordinate =
     let
         pieceIndex =
             board.coordinatePieces
-                |> Dict.get (toTuple coordinate)
+                |> Dict.get (coordinateToTuple coordinate)
     in
     Maybe.andThen (\index -> Dict.get index board.pieces) pieceIndex
 
@@ -349,7 +379,7 @@ getTentativePieceFromCoordinate board coordinate =
     let
         pieceIndex =
             board.tentativeCoordinatePieces
-                |> Dict.get (toTuple coordinate)
+                |> Dict.get (coordinateToTuple coordinate)
     in
     Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
 
@@ -368,7 +398,7 @@ mergeMagneticFields field1 field2 =
     }
 
 
-updateMagneticFieldDict : List ( BoardCoordinate, MagneticField ) -> Dict ( Int, Int ) MagneticField -> Dict ( Int, Int ) MagneticField
+updateMagneticFieldDict : List ( IntCoordinate, MagneticField ) -> Dict ( Int, Int ) MagneticField -> Dict ( Int, Int ) MagneticField
 updateMagneticFieldDict fields magneticFields =
     case fields of
         [] ->
@@ -377,7 +407,7 @@ updateMagneticFieldDict fields magneticFields =
         ( coordinate, field ) :: rest ->
             let
                 currentField =
-                    Dict.get (toTuple coordinate) magneticFields
+                    Dict.get (intCoordinateToTuple coordinate) magneticFields
             in
             case currentField of
                 Just f ->
@@ -385,10 +415,10 @@ updateMagneticFieldDict fields magneticFields =
                         newField =
                             mergeMagneticFields f field
                     in
-                    updateMagneticFieldDict rest (Dict.insert (toTuple coordinate) newField magneticFields)
+                    updateMagneticFieldDict rest (Dict.insert (intCoordinateToTuple coordinate) newField magneticFields)
 
                 Nothing ->
-                    updateMagneticFieldDict rest (Dict.insert (toTuple coordinate) field magneticFields)
+                    updateMagneticFieldDict rest (Dict.insert (intCoordinateToTuple coordinate) field magneticFields)
 
 
 getBoardMagneticField : Board -> Int -> Dict ( Int, Int ) MagneticField
@@ -402,7 +432,7 @@ getBoardMagneticField board magnetism =
     getBoardMagneticFieldRec board magnetism allCoordinates Dict.empty
 
 
-getBoardMagneticFieldRec : Board -> Int -> List BoardCoordinate -> Dict ( Int, Int ) MagneticField -> Dict ( Int, Int ) MagneticField
+getBoardMagneticFieldRec : Board -> Int -> List IntCoordinate -> Dict ( Int, Int ) MagneticField -> Dict ( Int, Int ) MagneticField
 getBoardMagneticFieldRec board magnetism remainingCoordinates magneticFields =
     case remainingCoordinates of
         [] ->
@@ -413,7 +443,7 @@ getBoardMagneticFieldRec board magnetism remainingCoordinates magneticFields =
                 currentField =
                     getMagneticFieldForCoordinate board magnetism coordinate
             in
-            getBoardMagneticFieldRec board magnetism rest (Dict.insert (toTuple coordinate) currentField magneticFields)
+            getBoardMagneticFieldRec board magnetism rest (Dict.insert (intCoordinateToTuple coordinate) currentField magneticFields)
 
 
 getCoordinatePieces : Board -> List ( BoardCoordinate, Piece )
@@ -430,14 +460,14 @@ getCoordinatePieces board =
             (\( coordinate, pieceIndex ) ->
                 case Dict.get pieceIndex allPieces of
                     Just piece ->
-                        Just ( fromTuple coordinate, piece )
+                        Just ( coordinateFromTuple coordinate, piece )
 
                     Nothing ->
                         Nothing
             )
 
 
-getMagneticFieldForCoordinate : Board -> Int -> BoardCoordinate -> MagneticField
+getMagneticFieldForCoordinate : Board -> Int -> IntCoordinate -> MagneticField
 getMagneticFieldForCoordinate board magnetism coordinate =
     let
         coordinatePieces =
@@ -451,18 +481,21 @@ getMagneticFieldForCoordinate board magnetism coordinate =
         coordinatePieces
 
 
-getFieldFromPieceAtCoordinate : Int -> BoardCoordinate -> BoardCoordinate -> Piece -> MagneticField
+getFieldFromPieceAtCoordinate : Int -> IntCoordinate -> BoardCoordinate -> Piece -> MagneticField
 getFieldFromPieceAtCoordinate magnetism coordinate pieceCoordinate piece =
-    if coordinate == pieceCoordinate then
+    if intCoordinateToFloat coordinate == pieceCoordinate then
         emptyMagneticField
 
     else
         let
+            floatCoordinate =
+                intCoordinateToFloat coordinate
+
             eDistance =
-                euclideanDistance coordinate pieceCoordinate
+                euclideanDistance floatCoordinate pieceCoordinate
 
             distanceVector =
-                { x = toFloat (coordinate.x - pieceCoordinate.x), y = toFloat (coordinate.y - pieceCoordinate.y) }
+                { x = floatCoordinate.x - pieceCoordinate.x, y = floatCoordinate.y - pieceCoordinate.y }
 
             distanceVectorSum =
                 abs distanceVector.x + abs distanceVector.y
@@ -506,7 +539,7 @@ updatePiecePositions friction board =
     updatePiecePositionsRecursive friction coordinatePieces board.magneticField board
 
 
-updatePiecePositionsRecursive : Float -> List ( ( Int, Int ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
+updatePiecePositionsRecursive : Float -> List ( ( Float, Float ), Int, Maybe Piece ) -> Dict ( Int, Int ) MagneticField -> Board -> Board
 updatePiecePositionsRecursive friction coordinatePieces magneticFields board =
     case coordinatePieces of
         [] ->
@@ -518,7 +551,7 @@ updatePiecePositionsRecursive friction coordinatePieces magneticFields board =
                     coordinatePiece
 
                 field =
-                    Dict.get coordinate magneticFields
+                    Dict.get (roundTuple coordinate) magneticFields
             in
             case piece of
                 Just p ->
@@ -588,7 +621,7 @@ insertPiece piece coordinate board =
     in
     { board
         | pieceCoordinates = Dict.insert pieceIndex coordinate board.pieceCoordinates
-        , coordinatePieces = Dict.insert (toTuple coordinate) pieceIndex board.coordinatePieces
+        , coordinatePieces = Dict.insert (coordinateToTuple coordinate) pieceIndex board.coordinatePieces
         , pieces = Dict.insert pieceIndex piece board.pieces
     }
 
@@ -601,7 +634,7 @@ insertTentativePiece piece coordinate board =
     in
     { board
         | tentativePieceCoordinates = Dict.fromList [ ( pieceIndex, coordinate ) ]
-        , tentativeCoordinatePieces = Dict.fromList [ ( toTuple coordinate, pieceIndex ) ]
+        , tentativeCoordinatePieces = Dict.fromList [ ( coordinateToTuple coordinate, pieceIndex ) ]
         , tentativePieces = Dict.fromList [ ( pieceIndex, piece ) ]
     }
 
@@ -617,7 +650,7 @@ removeTentativePieces board =
 
 movePieceCoordinate : BoardCoordinate -> IntVector -> BoardCoordinate
 movePieceCoordinate coordinate vector =
-    { x = coordinate.x + vector.x, y = coordinate.y + vector.y }
+    { x = coordinate.x + toFloat vector.x, y = coordinate.y + toFloat vector.y }
 
 
 getMaxMovementCoordinate : Int -> Board -> BoardCoordinate -> IntVector -> BoardCoordinate
@@ -650,12 +683,12 @@ movePieceUnsafe board pieceIndex vector =
         Just coordinate ->
             let
                 newPieceCoordinate =
-                    movePieceCoordinate vector coordinate
+                    movePieceCoordinate coordinate vector
             in
             { board
                 | pieceCoordinates = Dict.insert pieceIndex newPieceCoordinate board.pieceCoordinates
                 , coordinatePieces =
-                    Dict.insert (toTuple newPieceCoordinate) pieceIndex (Dict.remove (toTuple coordinate) board.coordinatePieces)
+                    Dict.insert (coordinateToTuple newPieceCoordinate) pieceIndex (Dict.remove (coordinateToTuple coordinate) board.coordinatePieces)
             }
 
         Nothing ->
@@ -664,7 +697,7 @@ movePieceUnsafe board pieceIndex vector =
 
 coordinateOnMap : BoardCoordinate -> Board -> Bool
 coordinateOnMap coordinate board =
-    coordinate.x >= 0 && coordinate.x < board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < board.config.gridDimensions
+    coordinate.x >= 0 && coordinate.x < toFloat board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < toFloat board.config.gridDimensions
 
 
 movePiece : Board -> Int -> IntVector -> Board
@@ -686,14 +719,14 @@ movePiece board pieceIndex vector =
                 { board
                     | pieceCoordinates = Dict.insert pieceIndex newCoordinate board.pieceCoordinates
                     , coordinatePieces =
-                        Dict.insert (toTuple newCoordinate) pieceIndex (Dict.remove (toTuple coordinate) board.coordinatePieces)
+                        Dict.insert (coordinateToTuple newCoordinate) pieceIndex (Dict.remove (coordinateToTuple coordinate) board.coordinatePieces)
                 }
 
             else
                 { board
                     | pieceCoordinates = Dict.remove pieceIndex board.pieceCoordinates
                     , coordinatePieces =
-                        Dict.remove (toTuple coordinate) board.coordinatePieces
+                        Dict.remove (coordinateToTuple coordinate) board.coordinatePieces
                 }
 
         Nothing ->
@@ -724,11 +757,7 @@ getBoardScores board =
     in
     Dict.foldl
         (\coordinate field existing ->
-            if coordinateOnMap (fromTuple coordinate) board then
-                addDicts existing (getFieldScore field)
-
-            else
-                existing
+            addDicts existing (getFieldScore field)
         )
         playerDict
         board.magneticField
@@ -755,7 +784,7 @@ getFreeCoordinates board =
 
         allCoordinates =
             List.range 0 (board.config.gridDimensions - 1)
-                |> List.map (\x -> List.range 0 (board.config.gridDimensions - 1) |> List.map (\y -> { x = x, y = y }))
+                |> List.map (\x -> List.range 0 (board.config.gridDimensions - 1) |> List.map (\y -> { x = toFloat x, y = toFloat y }))
                 |> List.concat
     in
     List.filter (\coordinate -> not (List.member coordinate currentTaken)) allCoordinates
@@ -763,7 +792,7 @@ getFreeCoordinates board =
 
 isSpaceFree : Board -> BoardCoordinate -> Bool
 isSpaceFree board coordinate =
-    case Dict.get (toTuple coordinate) board.coordinatePieces of
+    case Dict.get (coordinateToTuple coordinate) board.coordinatePieces of
         Just _ ->
             False
 
@@ -780,17 +809,17 @@ isSpaceFree board coordinate =
 -------------------------------------------------}
 
 
-determineCellContent : Dict ( Int, Int ) MagneticField -> Board -> BoardCoordinate -> CellContent
+determineCellContent : Dict ( Int, Int ) MagneticField -> Board -> IntCoordinate -> CellContent
 determineCellContent magneticField board coordinate =
     let
         piece =
-            getPieceFromCoordinate board coordinate
+            getPieceFromCoordinate board (intCoordinateToFloat coordinate)
 
         tentativePiece =
-            getTentativePieceFromCoordinate board coordinate
+            getTentativePieceFromCoordinate board (intCoordinateToFloat coordinate)
 
         field =
-            Dict.get (toTuple coordinate) magneticField
+            Dict.get (intCoordinateToTuple coordinate) magneticField
     in
     case piece of
         Just p ->
@@ -822,7 +851,7 @@ determineCellContent magneticField board coordinate =
 
 getCellGrid : Board -> CellGrid CellContent
 getCellGrid board =
-    CellGrid.initialize (Dimensions board.config.gridDimensions board.config.gridDimensions) (\i j -> determineCellContent board.magneticField board (fromArgs j i))
+    CellGrid.initialize (Dimensions board.config.gridDimensions board.config.gridDimensions) (\i j -> determineCellContent board.magneticField board { x = j, y = i })
 
 
 boardHtml : Int -> Board -> Html Msg

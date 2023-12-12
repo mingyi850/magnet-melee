@@ -167,8 +167,8 @@ getInitGameStatus settings =
 -}
 type Move
     = SelectPolarity Int Polarity
-    | PlacePiece BoardCoordinate Polarity
-    | DisplayPiece BoardCoordinate Polarity
+    | PlacePiece IntCoordinate Polarity
+    | DisplayPiece IntCoordinate Polarity
 
 
 type Status
@@ -192,7 +192,7 @@ applyMove move game =
             { status = Success, game = updatePlayerPolarity player polarity game }
 
         PlacePiece coordinate polarity ->
-            case getPieceFromCoordinate game.board coordinate of
+            case getPieceFromCoordinate game.board (intCoordinateToFloat coordinate) of
                 Just piece ->
                     { status = Failure, game = game }
 
@@ -202,18 +202,18 @@ applyMove move game =
                         { game
                             | board =
                                 removeTentativePieces game.board
-                                    |> insertPiece { player = game.turn, polarity = polarity } coordinate
+                                    |> insertPiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate)
                                     |> updateBoardMagneticField game.magnetism
                         }
                     }
 
         DisplayPiece coordinate polarity ->
-            case getPieceFromCoordinate game.board coordinate of
+            case getPieceFromCoordinate game.board (intCoordinateToFloat coordinate) of
                 Just piece ->
                     { status = Failure, game = game }
 
                 Nothing ->
-                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } coordinate game.board |> updateBoardMagneticField game.magnetism } }
+                    { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate) game.board |> updateBoardMagneticField game.magnetism } }
 
 
 generateRandomMove : Game -> RandomMove
@@ -306,7 +306,7 @@ withCmd cmd game =
 {- Get Cell Coordinates from CellGrid Click -}
 
 
-determineCellCoordinates : MyCellGrid.Msg -> BoardCoordinate
+determineCellCoordinates : MyCellGrid.Msg -> IntCoordinate
 determineCellCoordinates cellMsg =
     { x = cellMsg.cell.column
     , y = cellMsg.cell.row
@@ -524,10 +524,10 @@ alwaysCommand msg { game, status } =
 
 getMoveScore : Int -> MoveData -> Game -> Float
 getMoveScore player move game =
-    if isSpaceFree game.board { x = move.x, y = move.y } then
+    if isSpaceFree game.board (intCoordinateToFloat { x = move.x, y = move.y }) then
         let
             newGame =
-                { game | board = insertPiece { player = player, polarity = move.polarity } { x = move.x, y = move.y } game.board }
+                { game | board = insertPiece { player = player, polarity = move.polarity } (intCoordinateToFloat { x = move.x, y = move.y }) game.board }
 
             simulatedGame =
                 simulateGameBoard 20 game newGame
@@ -542,7 +542,7 @@ getAIMoveGreedy : Game -> MoveData
 getAIMoveGreedy game =
     let
         freeCoordinates =
-            getFreeCoordinates game.board
+            List.map (\coordinate -> floatCoordinateToInt coordinate) (getFreeCoordinates game.board)
 
         possibleMoves =
             List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Positive }) freeCoordinates
