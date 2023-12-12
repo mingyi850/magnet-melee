@@ -153,11 +153,8 @@ introText : Html Msg
 introText =
     div [ class "intro-text" ]
         [ p [] [ text "Magnet Melee! Control as much space on the board as possible using your magnetic powers." ]
-        , p [] [ text "Rule 1: Magnets of similar polarities repel each other while magnets of opposing polarity attract each other" ]
-        , p [] [ text "Rule 2: Magnets exert magnetic fields in only 8 directions" ]
-        , p [] [ text "Rule 3: The more space you control via your magnetic field, the more points you get" ]
-        , p [] [ text "Rule 4: Knock opponents magnets off the field to secure victory!" ]
-        , p [] [ text " The game ends when you run out of moves" ]
+        , p [] [ text "1. Magnetism defines the strength of each magnet - the stronger the magnet, the faster the magnets move." ]
+        , p [] [ text "2. Friction defines the amount of friction on the field - this controls how 'slidey' the field is" ]
         ]
 
 

@@ -66,6 +66,7 @@ type alias Game =
     , playerPolarity : Polarity
     , status : GameStatus
     , randomMove : RandomMove
+    , friction : Float
     }
 
 
@@ -135,6 +136,7 @@ init settings =
             , playerPolarity = Negative
             , status = getInitGameStatus settings
             , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = 0.0 }
+            , friction = settings.friction
             }
     in
     initialGame |> (\game -> withDetermineUpdateCommand game [] game)
@@ -192,7 +194,7 @@ applyMove move game =
             { status = Success, game = updatePlayerPolarity player polarity game }
 
         PlacePiece coordinate polarity ->
-            if checkValidPiecePlacement (intCoordinateToFloat coordinate) game.board then
+            if checkValidPiecePlacement (intCoordinateToFloat coordinate) Nothing game.board then
                 { status = Success
                 , game =
                     { game
@@ -207,7 +209,7 @@ applyMove move game =
                 { status = Failure, game = game }
 
         DisplayPiece coordinate polarity ->
-            if checkValidPiecePlacement (intCoordinateToFloat coordinate) game.board then
+            if checkValidPiecePlacement (intCoordinateToFloat coordinate) Nothing game.board then
                 { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate) game.board |> updateBoardMagneticField game.magnetism } }
 
             else
@@ -346,14 +348,14 @@ updatePlayerScores players scoreDict =
 
 
 updateGameBoard : Float -> Game -> Game
-updateGameBoard friction game =
+updateGameBoard magnitude game =
     let
         gameScores =
             getGameScore game
 
         newGame =
             { game
-                | board = updateBoardMagneticField game.magnetism (updatePiecePositions2 friction (updatePieceVelocities game.magnetism game.board))
+                | board = updateBoardMagneticField game.magnetism (updatePiecePositions (updatePieceVelocities game.friction game.magnetism game.board))
                 , players = updatePlayerScores game.players gameScores
             }
     in

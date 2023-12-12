@@ -48,6 +48,7 @@ in your Game when the user clicks StartGame.
 type alias Settings =
     { gridSize : Int
     , magnetism : Int
+    , friction : Float
     , maxMoves : Int
     , players : Int
     , playerAI : Array Int
@@ -63,7 +64,8 @@ For simplicity's sake, every setting MUST have a default value.
 default : Settings
 default =
     { gridSize = 50
-    , magnetism = 1000
+    , magnetism = 50
+    , friction = 0.5
     , maxMoves = 5
     , players = 2
     , playerAI = Array.repeat 2 0
@@ -80,6 +82,7 @@ setting). This is typically the same type as your setting.
 type Msg
     = SetGridSize Int
     | SetMagnetism Int
+    | SetFriction Float
     | SetNumMoves Int
     | SetNumPlayers Int
     | SetPlayerAi Int Int
@@ -95,10 +98,13 @@ update : Msg -> Settings -> Settings
 update msg settings =
     case msg of
         SetGridSize size ->
-            { settings | gridSize = size }
+            { settings | gridSize = size, magnetism = getMagnetismForGridSize settings.gridSize size settings.magnetism }
 
         SetMagnetism magnetism ->
             { settings | magnetism = magnetism }
+
+        SetFriction friction ->
+            { settings | friction = friction }
 
         SetNumMoves moves ->
             { settings | maxMoves = moves }
@@ -108,6 +114,15 @@ update msg settings =
 
         SetPlayerAi player ai ->
             { settings | playerAI = Array.set player ai settings.playerAI }
+
+
+getMagnetismForGridSize : Int -> Int -> Int -> Int
+getMagnetismForGridSize oldGridSize newGridSize oldMagnetism =
+    let
+        magnetismRatio =
+            toFloat oldMagnetism / toFloat oldGridSize
+    in
+    round (toFloat newGridSize * magnetismRatio)
 
 
 {-| STEP 5: Define a list of pickers for each setting you want to be able to change.
@@ -133,25 +148,29 @@ You can customise this further if you so wish (see the HELPER FUNCTIONS section 
 pickers : Settings -> List (SettingPickerItem Msg)
 pickers settings =
     [ inputIntRange
-        { label = "GridSize"
-        , value = settings.gridSize
-        , min = 10
-        , max = 50
-        , onChange = SetGridSize
-        }
-    , inputIntRange
-        { label = "Magnetism"
-        , value = settings.magnetism
-        , min = 10
-        , max = settings.gridSize ^ 2 * 10
-        , onChange = SetMagnetism
-        }
-    , inputIntRange
         { label = "Number of Moves"
         , value = settings.maxMoves
         , min = 1
         , max = 30
         , onChange = SetNumMoves
+        }
+    , pickChoiceButtons
+        { label = "GridSize"
+        , current = settings.gridSize
+        , options = [ ( "Small", 25 ), ( "Medium", 50 ), ( "Large", 100 ) ]
+        , onSelect = SetGridSize
+        }
+    , pickChoiceButtons
+        { label = "Magnetism"
+        , current = settings.magnetism
+        , options = [ ( "Weak", settings.gridSize // 2 ), ( "Medium", settings.gridSize ), ( "Strong", round (toFloat settings.gridSize * 1.5) ), ( "XtraStrong", round (toFloat settings.gridSize * 2) ) ]
+        , onSelect = SetMagnetism
+        }
+    , pickChoiceButtons
+        { label = "Friction"
+        , current = settings.friction
+        , options = [ ( "0.1", 0.1 ), ( "0.3", 0.3 ), ( "0.5", 0.5 ), ( "0.7", 0.7 ), ( "0.9", 0.9 ) ]
+        , onSelect = SetFriction
         }
     , pickChoiceButtons
         { label = "Number of Players"
