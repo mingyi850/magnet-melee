@@ -369,6 +369,7 @@ button#restart-button:active {
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
+  white-space: nowrap;
   justify-content: center;
   align-items: center;
   margin: 0%;
