@@ -526,7 +526,7 @@ updatePiecePositionsRecursive friction coordinatePieces magneticFields board =
                         Just f ->
                             let
                                 movementVector =
-                                    unitIntVector (getMovementVectorForMagnet friction friction f p)
+                                    scaledIntUnit 1 (getMovementVectorForMagnet friction friction f p)
                             in
                             updatePiecePositionsRecursive friction rest magneticFields (movePiece board pieceIndex movementVector)
 

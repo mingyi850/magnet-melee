@@ -111,7 +111,7 @@ renderPiece style position value =
         [ Svg.circle
             [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-            , Svg.Attributes.r (String.fromFloat (style.cellWidth / 2.5))
+            , Svg.Attributes.r (String.fromFloat style.cellWidth)
             , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
             , Svg.Attributes.fill (toCssString (style.toPieceColor value))
             , Svg.Attributes.stroke (toCssString style.gridLineColor)

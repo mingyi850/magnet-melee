@@ -62,8 +62,8 @@ For simplicity's sake, every setting MUST have a default value.
 -}
 default : Settings
 default =
-    { gridSize = 10
-    , magnetism = 3
+    { gridSize = 50
+    , magnetism = 1000
     , maxMoves = 5
     , players = 2
     , playerAI = Array.repeat 2 0
@@ -135,7 +135,7 @@ pickers settings =
     [ inputIntRange
         { label = "GridSize"
         , value = settings.gridSize
-        , min = 5
+        , min = 10
         , max = 50
         , onChange = SetGridSize
         }
@@ -143,7 +143,7 @@ pickers settings =
         { label = "Magnetism"
         , value = settings.magnetism
         , min = 10
-        , max = settings.gridSize * 100
+        , max = settings.gridSize ^ 2 * 10
         , onChange = SetMagnetism
         }
     , inputIntRange
