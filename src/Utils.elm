@@ -49,6 +49,18 @@ maxHsla =
     }
 
 
+type alias Coordinate =
+    { x : Float
+    , y : Float
+    }
+
+
+type alias ICoordinate =
+    { x : Int
+    , y : Int
+    }
+
+
 mergeHslas : List ( Hsla, Float ) -> Hsla
 mergeHslas hslaList =
     List.foldl (\( hsla, strength ) accum -> addHslaVectors (hslaToVector hsla strength) accum) zeroHslaVector hslaList
@@ -177,3 +189,82 @@ getPairs list =
                     |> List.drop (i + 1)
                     |> List.map (\y -> ( x, y ))
             )
+
+
+euclideanDistance : Coordinate -> Coordinate -> Float
+euclideanDistance coordinate1 coordinate2 =
+    let
+        xDiff =
+            coordinate1.x - coordinate2.x
+
+        yDiff =
+            coordinate1.y - coordinate2.y
+    in
+    Basics.sqrt (xDiff ^ 2 + yDiff ^ 2)
+
+
+coordinateToTuple : Coordinate -> ( Float, Float )
+coordinateToTuple coordinate =
+    ( coordinate.x, coordinate.y )
+
+
+intCoordinateToTuple : ICoordinate -> ( Int, Int )
+intCoordinateToTuple coordinate =
+    ( coordinate.x, coordinate.y )
+
+
+coordinateFromTuple : ( Float, Float ) -> Coordinate
+coordinateFromTuple ( x, y ) =
+    { x = x, y = y }
+
+
+intCoordinateFromTuple : ( Int, Int ) -> ICoordinate
+intCoordinateFromTuple ( x, y ) =
+    { x = x, y = y }
+
+
+intCoordinateToFloat : ICoordinate -> Coordinate
+intCoordinateToFloat { x, y } =
+    { x = toFloat x, y = toFloat y }
+
+
+floatCoordinateToInt : Coordinate -> ICoordinate
+floatCoordinateToInt { x, y } =
+    { x = round x, y = round y }
+
+
+coordinateFromArgs : Float -> Float -> Coordinate
+coordinateFromArgs x y =
+    { x = x, y = y }
+
+
+roundTuple : ( Float, Float ) -> ( Int, Int )
+roundTuple ( x, y ) =
+    ( round x, round y )
+
+
+tupleToFloat : ( Int, Int ) -> ( Float, Float )
+tupleToFloat ( x, y ) =
+    ( toFloat x, toFloat y )
+
+
+coordinateToString : Coordinate -> String
+coordinateToString coordinate =
+    "(" ++ String.fromFloat coordinate.x ++ "," ++ String.fromFloat coordinate.y ++ ")"
+
+
+getSurroundingCoordinates : Coordinate -> List Coordinate
+getSurroundingCoordinates coordinate =
+    let
+        x =
+            coordinate.x
+
+        y =
+            coordinate.y
+    in
+    [ { x = x, y = y }
+    , { x = x - 1, y = y }
+    , { x = x, y = y - 1 }
+    , { x = x, y = y + 1 }
+    , { x = x + 1, y = y }
+    ]

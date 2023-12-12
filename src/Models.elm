@@ -10,6 +10,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import MyCellGrid exposing (..)
+import Physics exposing (..)
 import Set exposing (..)
 import Utils exposing (..)
 import VectorUtils exposing (..)
@@ -131,51 +132,13 @@ type CellContent
 -------------------------------------------------}
 
 
-playerColorToRGB : PlayerColor -> ( Float, Float, Float )
-playerColorToRGB color =
-    case color of
-        Red ->
-            ( 255, 0, 0 )
-
-        Blue ->
-            ( 0, 0, 255 )
-
-        Green ->
-            ( 0, 255, 0 )
-
-        Yellow ->
-            ( 255, 255, 0 )
-
-        White ->
-            ( 255, 255, 255 )
-
-
 emptyHsla : Hsla
 emptyHsla =
     { hue = 0, saturation = 0, lightness = 0, alpha = 0 }
 
 
-playerColorToHslaBoard : PlayerColor -> Float -> Float -> Float -> Hsla
-playerColorToHslaBoard playerColor strength totalStrength gameMagnetism =
-    case playerColor of
-        Red ->
-            { hue = hueToRadians 0, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
-
-        Blue ->
-            { hue = hueToRadians 240, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
-
-        Green ->
-            { hue = hueToRadians 120, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
-
-        Yellow ->
-            { hue = hueToRadians 60, saturation = 1, lightness = 0.6 - (strength / gameMagnetism / 4), alpha = strength / totalStrength }
-
-        White ->
-            { hue = hueToRadians 0, saturation = 1, lightness = 1, alpha = 0 }
-
-
-playerColorToHslaBoard2 : Int -> PlayerColor -> Float -> Float -> Float -> Hsla
-playerColorToHslaBoard2 totalPieces playerColor strength totalStrength gameMagnetism =
+playerColorToHslaBoard : Int -> PlayerColor -> Float -> Float -> Hsla
+playerColorToHslaBoard totalPieces playerColor strength gameMagnetism =
     case playerColor of
         Red ->
             { hue = hueToRadians 0, saturation = 1, lightness = 0.75 - (0.5 * Basics.sqrt (strength / toFloat totalPieces / gameMagnetism)), alpha = 0.9 }
@@ -191,11 +154,6 @@ playerColorToHslaBoard2 totalPieces playerColor strength totalStrength gameMagne
 
         White ->
             { hue = hueToRadians 0, saturation = 1, lightness = 1, alpha = 0 }
-
-
-getLigthness : Float -> Float -> Float
-getLigthness strength gameMagnetism =
-    strength / gameMagnetism / 1.2 - 0.1
 
 
 hslaToColor : Hsla -> Color.Color
@@ -239,7 +197,7 @@ getPieceColor piece =
                 None ->
                     0.5
     in
-    playerColorToHslaBoard (getPlayerColor piece.player) 1 1 1
+    playerColorToHslaBoard 1 (getPlayerColor piece.player) 1 1
         |> (\hsla -> { hsla | lightness = lightness, alpha = 1 })
         |> hslaToColor
 
@@ -289,68 +247,6 @@ toPolarityIcon polarity =
             ""
 
 
-coordinateToTuple : BoardCoordinate -> ( Float, Float )
-coordinateToTuple coordinate =
-    ( coordinate.x, coordinate.y )
-
-
-intCoordinateToTuple : IntCoordinate -> ( Int, Int )
-intCoordinateToTuple coordinate =
-    ( coordinate.x, coordinate.y )
-
-
-coordinateFromTuple : ( Float, Float ) -> BoardCoordinate
-coordinateFromTuple ( x, y ) =
-    { x = x, y = y }
-
-
-intCoordinateFromTuple : ( Int, Int ) -> IntCoordinate
-intCoordinateFromTuple ( x, y ) =
-    { x = x, y = y }
-
-
-intCoordinateToFloat : IntCoordinate -> BoardCoordinate
-intCoordinateToFloat { x, y } =
-    { x = toFloat x, y = toFloat y }
-
-
-floatCoordinateToInt : BoardCoordinate -> IntCoordinate
-floatCoordinateToInt { x, y } =
-    { x = round x, y = round y }
-
-
-fromArgs : Float -> Float -> BoardCoordinate
-fromArgs x y =
-    { x = x, y = y }
-
-
-roundTuple : ( Float, Float ) -> ( Int, Int )
-roundTuple ( x, y ) =
-    ( round x, round y )
-
-
-tupleToFloat : ( Int, Int ) -> ( Float, Float )
-tupleToFloat ( x, y ) =
-    ( toFloat x, toFloat y )
-
-
-coordinateToString : BoardCoordinate -> String
-coordinateToString coordinate =
-    "(" ++ String.fromFloat coordinate.x ++ "," ++ String.fromFloat coordinate.y ++ ")"
-
-
-euclideanDistance : BoardCoordinate -> BoardCoordinate -> Float
-euclideanDistance coordinate1 coordinate2 =
-    let
-        xDiff =
-            coordinate1.x - coordinate2.x
-
-        yDiff =
-            coordinate1.y - coordinate2.y
-    in
-    Basics.sqrt (xDiff ^ 2 + yDiff ^ 2)
-
-
 emptyBoard : BoardConfig -> Board
 emptyBoard boardConfig =
     { pieces = Dict.empty
@@ -394,23 +290,6 @@ checkValidPiecePlacement coordinate toOmit board =
         |> List.isEmpty
 
 
-getSurroundingCoordinates : BoardCoordinate -> List BoardCoordinate
-getSurroundingCoordinates coordinate =
-    let
-        x =
-            coordinate.x
-
-        y =
-            coordinate.y
-    in
-    [ { x = x, y = y }
-    , { x = x - 1, y = y }
-    , { x = x, y = y - 1 }
-    , { x = x, y = y + 1 }
-    , { x = x + 1, y = y }
-    ]
-
-
 getTentativePieceFromCoordinate : Board -> BoardCoordinate -> Maybe Piece
 getTentativePieceFromCoordinate board coordinate =
     let
@@ -419,6 +298,11 @@ getTentativePieceFromCoordinate board coordinate =
                 |> Dict.get (coordinateToTuple coordinate)
     in
     Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
+
+
+coordinateOnBoard : BoardCoordinate -> Board -> Bool
+coordinateOnBoard coordinate board =
+    coordinate.x >= 0 && coordinate.x < toFloat board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < toFloat board.config.gridDimensions
 
 
 combineMaybeVectors : FloatVector -> Maybe FloatVector -> FloatVector
@@ -434,6 +318,27 @@ combineMaybeVectors vector maybeVector =
 updateForceDict : Dict Int FloatVector -> Dict Int FloatVector -> Dict Int FloatVector
 updateForceDict forceDict newForceDict =
     Dict.foldl (\player force accumDict -> Dict.insert player (combineMaybeVectors force (Dict.get player accumDict)) accumDict) forceDict newForceDict
+
+
+getCoordinatePieces : Board -> List ( Int, BoardCoordinate, Piece )
+getCoordinatePieces board =
+    let
+        allPieces =
+            combineDicts board.pieces board.tentativePieces
+
+        allCoordinatePieces =
+            combineDicts board.coordinatePieces board.tentativeCoordinatePieces
+    in
+    Dict.toList allCoordinatePieces
+        |> List.filterMap
+            (\( coordinate, pieceIndex ) ->
+                case Dict.get pieceIndex allPieces of
+                    Just piece ->
+                        Just ( pieceIndex, coordinateFromTuple coordinate, piece )
+
+                    Nothing ->
+                        Nothing
+            )
 
 
 
@@ -498,27 +403,6 @@ getBoardMagneticFieldRec board magnetism remainingCoordinates magneticFields =
             getBoardMagneticFieldRec board magnetism rest (Dict.insert (intCoordinateToTuple coordinate) currentField magneticFields)
 
 
-getCoordinatePieces : Board -> List ( Int, BoardCoordinate, Piece )
-getCoordinatePieces board =
-    let
-        allPieces =
-            combineDicts board.pieces board.tentativePieces
-
-        allCoordinatePieces =
-            combineDicts board.coordinatePieces board.tentativeCoordinatePieces
-    in
-    Dict.toList allCoordinatePieces
-        |> List.filterMap
-            (\( coordinate, pieceIndex ) ->
-                case Dict.get pieceIndex allPieces of
-                    Just piece ->
-                        Just ( pieceIndex, coordinateFromTuple coordinate, piece )
-
-                    Nothing ->
-                        Nothing
-            )
-
-
 getMagneticFieldForCoordinate : Board -> Int -> IntCoordinate -> MagneticField
 getMagneticFieldForCoordinate board magnetism coordinate =
     let
@@ -531,33 +415,6 @@ getMagneticFieldForCoordinate board magnetism coordinate =
         )
         emptyMagneticField
         coordinatePieces
-
-
-calculateForceVector : Int -> BoardCoordinate -> BoardCoordinate -> ( FloatVector, Float )
-calculateForceVector magnetism coordinate pieceCoordinate =
-    let
-        eDistance =
-            euclideanDistance coordinate pieceCoordinate
-
-        distanceVector =
-            { x = coordinate.x - pieceCoordinate.x, y = coordinate.y - pieceCoordinate.y }
-
-        distanceVectorSum =
-            abs distanceVector.x + abs distanceVector.y
-
-        magnetStrength =
-            if eDistance == 0 then
-                0
-
-            else
-                toFloat magnetism / (eDistance ^ 2)
-
-        resultantVector =
-            { x = distanceVector.x * magnetStrength / distanceVectorSum
-            , y = distanceVector.y * magnetStrength / distanceVectorSum
-            }
-    in
-    ( resultantVector, magnetStrength )
 
 
 getFieldFromPieceAtCoordinate : Int -> IntCoordinate -> BoardCoordinate -> Piece -> MagneticField
@@ -591,78 +448,6 @@ updateBoardMagneticField magnetism board =
     }
 
 
-updatePiecePositions : Board -> Board
-updatePiecePositions board =
-    let
-        coordinatePieces =
-            Dict.values (Dict.map (\coordinate index -> ( coordinate, index, Dict.get index board.pieces )) board.coordinatePieces)
-    in
-    updatePiecePositionsRecursive coordinatePieces board
-
-
-updatePiecePositionsRecursive : List ( ( Float, Float ), Int, Maybe Piece ) -> Board -> Board
-updatePiecePositionsRecursive coordinatePieces board =
-    case coordinatePieces of
-        [] ->
-            board
-
-        coordinatePiece :: rest ->
-            let
-                ( coordinate, pieceIndex, piece ) =
-                    coordinatePiece
-
-                velocity =
-                    Dict.get pieceIndex board.pieceVelocities
-            in
-            case piece of
-                Just p ->
-                    case velocity of
-                        Just f ->
-                            let
-                                movementVector =
-                                    floatCoordinateToInt (multiplyVector 1 f)
-                            in
-                            updatePiecePositionsRecursive rest (movePiece board pieceIndex movementVector)
-
-                        Nothing ->
-                            updatePiecePositionsRecursive rest board
-
-                Nothing ->
-                    updatePiecePositionsRecursive rest board
-
-
-getFrictionVector : Float -> FloatVector -> FloatVector
-getFrictionVector friction vector =
-    let
-        xMagnitude =
-            abs vector.x
-
-        yMagnitude =
-            abs vector.y
-
-        xFriction =
-            friction * xMagnitude
-
-        yFriction =
-            friction * yMagnitude
-
-        xSign =
-            if vector.x < 0 then
-                1
-
-            else
-                -1
-
-        ySign =
-            if vector.y < 0 then
-                1
-
-            else
-                -1
-    in
-    { x = xFriction * xSign, y = yFriction * ySign }
-
-
 updatePieceCollisions : Board -> Board
 updatePieceCollisions board =
     let
@@ -686,15 +471,6 @@ checkAllVectorStop board =
     { board
         | pieceVelocities = newPieceVelocities
     }
-
-
-checkVectorStop : FloatVector -> FloatVector
-checkVectorStop vector =
-    if sqrt (vector.x ^ 2 + vector.y ^ 2) < 1 then
-        { x = 0, y = 0 }
-
-    else
-        vector
 
 
 updatePieceVelocities : Float -> Int -> Board -> Board
@@ -737,17 +513,8 @@ getCollidingPieceUpdates board velocities =
                     case ( Dict.get i1 velocities, Dict.get i2 velocities ) of
                         ( Just v1, Just v2 ) ->
                             let
-                                proportion =
-                                    vectorMagnitude v1 / (vectorMagnitude v1 + vectorMagnitude v2)
-
-                                impulse =
-                                    calculateImpulse 1 v1 v2 (calculateCollisionNormal c1 c2)
-
-                                antiV1 =
-                                    multiplyVector proportion impulse
-
-                                antiV2 =
-                                    multiplyVector (1 - proportion) (negative impulse)
+                                ( antiV1, antiV2 ) =
+                                    calculateCollisionVector ( c1, v1 ) ( c2, v2 )
                             in
                             updateForceDict (Dict.fromList [ ( i1, antiV1 ), ( i2, antiV2 ) ]) accumDict
 
@@ -758,54 +525,6 @@ getCollidingPieceUpdates board velocities =
                 collidingPieces
     in
     velocitiesAfterCollision
-
-
-calculateImpulse : Float -> FloatVector -> FloatVector -> FloatVector -> FloatVector
-calculateImpulse restitution velocity1 velocity2 collisionNormal =
-    let
-        relativeVelocity =
-            { x = velocity1.x - velocity2.x, y = velocity1.y - velocity2.y }
-
-        velocityScaleAlongNormal =
-            relativeVelocity.x * collisionNormal.x + relativeVelocity.y * collisionNormal.y
-
-        velocityAlongNormalVector =
-            { x = restitution * velocityScaleAlongNormal * collisionNormal.x, y = restitution * velocityScaleAlongNormal * collisionNormal.y }
-
-        impulse =
-            if velocityScaleAlongNormal > 0 then
-                negative velocityAlongNormalVector
-
-            else
-                { x = 0, y = 0 }
-    in
-    impulse
-
-
-calculateCollisionNormal : BoardCoordinate -> BoardCoordinate -> FloatVector
-calculateCollisionNormal position1 position2 =
-    let
-        directionVector =
-            { x = position2.x - position1.x, y = position2.y - position1.y }
-
-        magnitude =
-            sqrt (directionVector.x ^ 2 + directionVector.y ^ 2)
-
-        collisionNormal =
-            { x = directionVector.x / magnitude, y = directionVector.y / magnitude }
-    in
-    collisionNormal
-
-
-getCollidedPiecesFromPairs : List ( ( Int, BoardCoordinate, Piece ), ( Int, BoardCoordinate, Piece ) ) -> Set Int
-getCollidedPiecesFromPairs pairs =
-    List.foldl
-        (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) accum ->
-            [ i1, i2 ] ++ accum
-        )
-        []
-        pairs
-        |> Set.fromList
 
 
 getCollidingPieces : Board -> List ( ( Int, BoardCoordinate, Piece ), ( Int, BoardCoordinate, Piece ) )
@@ -914,6 +633,46 @@ movePieceCoordinate coordinate vector =
     { x = coordinate.x + toFloat vector.x, y = coordinate.y + toFloat vector.y }
 
 
+updatePiecePositions : Board -> Board
+updatePiecePositions board =
+    let
+        coordinatePieces =
+            Dict.values (Dict.map (\coordinate index -> ( coordinate, index, Dict.get index board.pieces )) board.coordinatePieces)
+    in
+    updatePiecePositionsRecursive coordinatePieces board
+
+
+updatePiecePositionsRecursive : List ( ( Float, Float ), Int, Maybe Piece ) -> Board -> Board
+updatePiecePositionsRecursive coordinatePieces board =
+    case coordinatePieces of
+        [] ->
+            board
+
+        coordinatePiece :: rest ->
+            let
+                ( coordinate, pieceIndex, piece ) =
+                    coordinatePiece
+
+                velocity =
+                    Dict.get pieceIndex board.pieceVelocities
+            in
+            case piece of
+                Just p ->
+                    case velocity of
+                        Just f ->
+                            let
+                                movementVector =
+                                    floatCoordinateToInt (multiplyVector 1 f)
+                            in
+                            updatePiecePositionsRecursive rest (movePiece board pieceIndex movementVector)
+
+                        Nothing ->
+                            updatePiecePositionsRecursive rest board
+
+                Nothing ->
+                    updatePiecePositionsRecursive rest board
+
+
 getMaxMovementCoordinate : Int -> Board -> BoardCoordinate -> IntVector -> BoardCoordinate
 getMaxMovementCoordinate pieceIndex board coordinate vector =
     let
@@ -958,11 +717,6 @@ movePieceUnsafe board pieceIndex vector =
             board
 
 
-coordinateOnMap : BoardCoordinate -> Board -> Bool
-coordinateOnMap coordinate board =
-    coordinate.x >= 0 && coordinate.x < toFloat board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < toFloat board.config.gridDimensions
-
-
 movePiece : Board -> Int -> IntVector -> Board
 movePiece board pieceIndex vector =
     let
@@ -976,7 +730,7 @@ movePiece board pieceIndex vector =
                     getMaxMovementCoordinate pieceIndex board coordinate vector
 
                 newCoordinateOnMap =
-                    coordinateOnMap newCoordinate board
+                    coordinateOnBoard newCoordinate board
             in
             if newCoordinateOnMap then
                 { board
@@ -1156,12 +910,8 @@ getCellOpacityFromContent opacity content =
             1 - (opacity ^ toFloat (Dict.size field.playerStrength))
 
 
-getMagneticFieldColorWinner : Int -> MagneticField -> Color.Color
-getMagneticFieldColorWinner magnetism field =
-    let
-        totalStrength =
-            Dict.foldl (\player strength total -> total + strength) 0 field.playerStrength
-    in
+getMagneticFieldColorWinner : Int -> Int -> MagneticField -> Color.Color
+getMagneticFieldColorWinner totalPieces magnetism field =
     Dict.foldl
         (\player strength ( p2, s2 ) ->
             if strength > s2 then
@@ -1172,7 +922,7 @@ getMagneticFieldColorWinner magnetism field =
         )
         ( 1, -1000 )
         field.playerStrength
-        |> (\( player, strength ) -> playerColorToHslaBoard (getPlayerColor player) strength totalStrength (toFloat magnetism))
+        |> (\( player, strength ) -> playerColorToHslaBoard totalPieces (getPlayerColor player) strength (toFloat magnetism))
         |> hslaToColor
 
 
@@ -1183,7 +933,7 @@ getMagneticFieldColorMixed totalPieces magnetism field =
             Dict.foldl (\player strength total -> total + strength) 0 field.playerStrength
     in
     if totalStrength > 0 then
-        Dict.map (\player strength -> ( playerColorToHslaBoard2 totalPieces (getPlayerColor player) strength totalStrength (toFloat magnetism), strength / totalStrength )) field.playerStrength
+        Dict.map (\player strength -> ( playerColorToHslaBoard totalPieces (getPlayerColor player) strength (toFloat magnetism), strength / totalStrength )) field.playerStrength
             |> Dict.values
             |> mergeHslas
             |> fromHsla
