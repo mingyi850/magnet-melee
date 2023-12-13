@@ -63,8 +63,14 @@ type alias ICoordinate =
 
 mergeHslas : List ( Hsla, Float ) -> Hsla
 mergeHslas hslaList =
-    List.foldl (\( hsla, strength ) accum -> addHslaVectors (hslaToVector hsla strength) accum) zeroHslaVector hslaList
-        --|> divHslaVector (toFloat (List.length hslaList))
+    let
+        softmaxStrengths =
+            hslaList
+                |> List.map Tuple.second
+                |> sqAvg
+                |> List.map2 (\( hsla, _ ) softmaxStrength -> ( hsla, softmaxStrength )) hslaList
+    in
+    List.foldl (\( hsla, strength ) accum -> addHslaVectors (hslaToVector hsla strength) accum) zeroHslaVector softmaxStrengths
         |> hslaVectorToHsla
 
 
@@ -268,3 +274,27 @@ getSurroundingCoordinates coordinate =
     , { x = x, y = y + 1 }
     , { x = x + 1, y = y }
     ]
+
+
+softmax : List Float -> List Float
+softmax list =
+    let
+        exps =
+            List.map (\x -> Basics.e ^ x) list
+
+        sum =
+            List.sum exps
+    in
+    List.map (\x -> x / sum) exps
+
+
+sqAvg : List Float -> List Float
+sqAvg list =
+    let
+        exps =
+            List.map (\x -> x ^ 2) list
+
+        sum =
+            List.sum exps
+    in
+    List.map (\x -> x / sum) exps
