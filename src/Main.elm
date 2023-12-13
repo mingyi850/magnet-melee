@@ -16,6 +16,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Settings exposing (..)
+import Task exposing (..)
 import Time exposing (..)
 
 
@@ -70,6 +71,7 @@ type Msg
     | ClickedStartGame
     | ClickedRestart
     | Tick Posix
+    | StartGameNow Posix
 
 
 {-| Helper function to allow piping of a Cmd Msg into a tuple with a Model.
@@ -102,13 +104,12 @@ update msg screen =
 
                 -- When the user clicks Start Game, we initialize a new Game with the current settings.
                 ClickedStartGame ->
-                    Game.init settings
-                        |> mapGameCmd
+                    SettingsScreen settings
+                        |> withCmd (Task.perform StartGameNow Time.now)
 
-                Tick posix ->
-                    { settings | time = posixToMillis posix }
-                        |> SettingsScreen
-                        |> withCmd Cmd.none
+                StartGameNow posix ->
+                    Game.init { settings | time = posixToMillis posix }
+                        |> mapGameCmd
 
                 -- You shouldn't get any Gameplay messages from the Settings screen, but if you do, just return the current screen as-is.
                 _ ->
@@ -198,11 +199,6 @@ view screen =
 --------------------------------------------------------------------------------
 
 
-subscriptions : Sub Msg
-subscriptions =
-    Time.every 100000 Tick
-
-
 {-| The actual main entrypoint to run the application.
 
 If your game isn't too complicated, you probably don't need to modify this at all.
@@ -219,5 +215,5 @@ main =
         { view = view
         , init = \_ -> init
         , update = update
-        , subscriptions = always subscriptions
+        , subscriptions = \_ -> Sub.none
         }

@@ -1,6 +1,5 @@
 module Models exposing (..)
 
-import Array
 import CellGrid exposing (..)
 import Color exposing (..)
 import Common exposing (Player)
@@ -10,7 +9,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import MyCellGrid exposing (..)
-import Physics exposing (..)
+import PhysicsUtils exposing (..)
 import Set exposing (..)
 import Utils exposing (..)
 import VectorUtils exposing (..)
@@ -241,7 +240,7 @@ toPolarityIcon polarity =
             "+"
 
         Negative ->
-            "-"
+            "−"
 
         None ->
             ""
@@ -305,19 +304,13 @@ coordinateOnBoard coordinate board =
     coordinate.x >= 0 && coordinate.x < toFloat board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < toFloat board.config.gridDimensions
 
 
-combineMaybeVectors : FloatVector -> Maybe FloatVector -> FloatVector
-combineMaybeVectors vector maybeVector =
-    case maybeVector of
-        Just v ->
-            combineVectors vector v
-
-        Nothing ->
-            vector
-
-
 updateForceDict : Dict Int FloatVector -> Dict Int FloatVector -> Dict Int FloatVector
 updateForceDict forceDict newForceDict =
     Dict.foldl (\player force accumDict -> Dict.insert player (combineMaybeVectors force (Dict.get player accumDict)) accumDict) forceDict newForceDict
+
+
+
+{- Gets a mapping of pieceIndex, coordinate, and piece -}
 
 
 getCoordinatePieces : Board -> List ( Int, BoardCoordinate, Piece )
@@ -347,37 +340,17 @@ getCoordinatePieces board =
 -------------------------------------------------}
 
 
-mergeMagneticFields : MagneticField -> MagneticField -> MagneticField
-mergeMagneticFields field1 field2 =
-    { positiveVector = { x = field1.positiveVector.x + field2.positiveVector.x, y = field1.positiveVector.y + field2.positiveVector.y }
-    , negativeVector = { x = field1.negativeVector.x + field2.negativeVector.x, y = field1.negativeVector.y + field2.negativeVector.y }
-    , playerStrength = addDicts field1.playerStrength field2.playerStrength
+{-| Recalculates and updates the magnetic field on the board
+-}
+updateBoardMagneticField : Int -> Board -> Board
+updateBoardMagneticField magnetism board =
+    { board
+        | magneticField = getBoardMagneticField board magnetism
     }
 
 
-updateMagneticFieldDict : List ( IntCoordinate, MagneticField ) -> Dict ( Int, Int ) MagneticField -> Dict ( Int, Int ) MagneticField
-updateMagneticFieldDict fields magneticFields =
-    case fields of
-        [] ->
-            magneticFields
-
-        ( coordinate, field ) :: rest ->
-            let
-                currentField =
-                    Dict.get (intCoordinateToTuple coordinate) magneticFields
-            in
-            case currentField of
-                Just f ->
-                    let
-                        newField =
-                            mergeMagneticFields f field
-                    in
-                    updateMagneticFieldDict rest (Dict.insert (intCoordinateToTuple coordinate) newField magneticFields)
-
-                Nothing ->
-                    updateMagneticFieldDict rest (Dict.insert (intCoordinateToTuple coordinate) field magneticFields)
-
-
+{-| Recalculates the Magnetic Field on the board
+-}
 getBoardMagneticField : Board -> Int -> Dict ( Int, Int ) MagneticField
 getBoardMagneticField board magnetism =
     let
@@ -389,6 +362,8 @@ getBoardMagneticField board magnetism =
     getBoardMagneticFieldRec board magnetism allCoordinates Dict.empty
 
 
+{-| Helper function to calculate magnetic field recursively
+-}
 getBoardMagneticFieldRec : Board -> Int -> List IntCoordinate -> Dict ( Int, Int ) MagneticField -> Dict ( Int, Int ) MagneticField
 getBoardMagneticFieldRec board magnetism remainingCoordinates magneticFields =
     case remainingCoordinates of
@@ -403,6 +378,8 @@ getBoardMagneticFieldRec board magnetism remainingCoordinates magneticFields =
             getBoardMagneticFieldRec board magnetism rest (Dict.insert (intCoordinateToTuple coordinate) currentField magneticFields)
 
 
+{-| Gets Magnetic field for at a specific Coordinate
+-}
 getMagneticFieldForCoordinate : Board -> Int -> IntCoordinate -> MagneticField
 getMagneticFieldForCoordinate board magnetism coordinate =
     let
@@ -417,6 +394,8 @@ getMagneticFieldForCoordinate board magnetism coordinate =
         coordinatePieces
 
 
+{-| Calculates the magnetic field exerted by a single piece on a single coordinate
+-}
 getFieldFromPieceAtCoordinate : Int -> IntCoordinate -> BoardCoordinate -> Piece -> MagneticField
 getFieldFromPieceAtCoordinate magnetism coordinate pieceCoordinate piece =
     if intCoordinateToFloat coordinate == pieceCoordinate then
@@ -441,38 +420,24 @@ getFieldFromPieceAtCoordinate magnetism coordinate pieceCoordinate piece =
                 { positiveVector = { x = 0, y = 0 }, negativeVector = { x = 0, y = 0 }, playerStrength = Dict.empty }
 
 
-updateBoardMagneticField : Int -> Board -> Board
-updateBoardMagneticField magnetism board =
-    { board
-        | magneticField = getBoardMagneticField board magnetism
+{-| Utility Function to merge 2 magnetic fields at a point
+-}
+mergeMagneticFields : MagneticField -> MagneticField -> MagneticField
+mergeMagneticFields field1 field2 =
+    { positiveVector = { x = field1.positiveVector.x + field2.positiveVector.x, y = field1.positiveVector.y + field2.positiveVector.y }
+    , negativeVector = { x = field1.negativeVector.x + field2.negativeVector.x, y = field1.negativeVector.y + field2.negativeVector.y }
+    , playerStrength = addDicts field1.playerStrength field2.playerStrength
     }
 
 
-updatePieceCollisions : Board -> Board
-updatePieceCollisions board =
-    let
-        updates =
-            getCollidingPieceUpdates board board.pieceVelocities
 
-        newPieceVelocities =
-            updateForceDict board.pieceVelocities updates
-    in
-    { board
-        | pieceVelocities = newPieceVelocities
-    }
+{-------------------------------------------------
+   Velocity Update Functions
+-------------------------------------------------}
 
 
-checkAllVectorStop : Board -> Board
-checkAllVectorStop board =
-    let
-        newPieceVelocities =
-            Dict.map (\i v -> checkVectorStop v) board.pieceVelocities
-    in
-    { board
-        | pieceVelocities = newPieceVelocities
-    }
-
-
+{-| Main function to update the board state with velocities of pieces based on friction and magnetism
+-}
 updatePieceVelocities : Float -> Int -> Board -> Board
 updatePieceVelocities friction magnetism board =
     let
@@ -494,6 +459,81 @@ updatePieceVelocities friction magnetism board =
         |> checkAllVectorStop
 
 
+{-| Calculates the magnetic force enacted on each piece at a specific moment
+-}
+getMagneticForceOnAllPieces : Int -> Board -> Dict Int FloatVector
+getMagneticForceOnAllPieces magnetism board =
+    let
+        coordinatePieces =
+            getCoordinatePieces board
+
+        coordinatePiecesWithoutTentative =
+            List.filter (\( index, _, _ ) -> not (Dict.member index board.tentativePieces)) coordinatePieces
+
+        coordinatePairs =
+            getPairs coordinatePiecesWithoutTentative
+    in
+    List.foldl
+        (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) accumDict ->
+            let
+                force =
+                    getMagneticForceBetweenPieces magnetism coord1 piece1 coord2 piece2
+
+                resultantDict =
+                    Dict.fromList [ ( i1, force ), ( i2, negative force ) ]
+            in
+            updateForceDict accumDict resultantDict
+        )
+        Dict.empty
+        coordinatePairs
+
+
+{-| Utility function to calculate the magnetic force between 2 pieces
+-}
+getMagneticForceBetweenPieces : Int -> BoardCoordinate -> Piece -> BoardCoordinate -> Piece -> FloatVector
+getMagneticForceBetweenPieces magnetism coordinate1 piece1 coordinate2 piece2 =
+    let
+        ( force, totalStrength ) =
+            calculateForceVector magnetism coordinate1 coordinate2
+    in
+    if piece1.polarity == piece2.polarity then
+        force
+
+    else
+        negative force
+
+
+{-| Calculates board Velocities after Collisions
+-}
+updatePieceCollisions : Board -> Board
+updatePieceCollisions board =
+    let
+        updates =
+            getCollidingPieceUpdates board board.pieceVelocities
+
+        newPieceVelocities =
+            updateForceDict board.pieceVelocities updates
+    in
+    { board
+        | pieceVelocities = newPieceVelocities
+    }
+
+
+{-| Zeroes vectors which have hit a specific threshold
+-}
+checkAllVectorStop : Board -> Board
+checkAllVectorStop board =
+    let
+        newPieceVelocities =
+            Dict.map (\i v -> checkVectorStop v) board.pieceVelocities
+    in
+    { board
+        | pieceVelocities = newPieceVelocities
+    }
+
+
+{-| Zeroes all piece velocities between moves
+-}
 zeroPieceVelocities : Board -> Board
 zeroPieceVelocities board =
     { board
@@ -527,6 +567,8 @@ getCollidingPieceUpdates board velocities =
     velocitiesAfterCollision
 
 
+{-| Checks piece positions to get colliding pieces
+-}
 getCollidingPieces : Board -> List ( ( Int, BoardCoordinate, Piece ), ( Int, BoardCoordinate, Piece ) )
 getCollidingPieces board =
     let
@@ -547,52 +589,14 @@ getCollidingPieces board =
         coordinatePairs
 
 
-getMagneticForceOnAllPieces : Int -> Board -> Dict Int FloatVector
-getMagneticForceOnAllPieces magnetism board =
-    let
-        coordinatePieces =
-            getCoordinatePieces board
-
-        coordinatePiecesWithoutTentative =
-            List.filter (\( index, _, _ ) -> not (Dict.member index board.tentativePieces)) coordinatePieces
-
-        coordinatePairs =
-            getPairs coordinatePiecesWithoutTentative
-    in
-    List.foldl
-        (\( ( i1, coord1, piece1 ), ( i2, coord2, piece2 ) ) accumDict ->
-            let
-                force =
-                    getMagneticForceBetweenPieces magnetism coord1 piece1 coord2 piece2
-
-                resultantDict =
-                    Dict.fromList [ ( i1, force ), ( i2, negative force ) ]
-            in
-            updateForceDict accumDict resultantDict
-        )
-        Dict.empty
-        coordinatePairs
-
-
-getMagneticForceBetweenPieces : Int -> BoardCoordinate -> Piece -> BoardCoordinate -> Piece -> FloatVector
-getMagneticForceBetweenPieces magnetism coordinate1 piece1 coordinate2 piece2 =
-    let
-        ( force, totalStrength ) =
-            calculateForceVector magnetism coordinate1 coordinate2
-    in
-    if piece1.polarity == piece2.polarity then
-        force
-
-    else
-        negative force
-
-
 
 {-------------------------------------------------
    Piece Movement and Insertion Functions
 -------------------------------------------------}
 
 
+{-| Inserts a piece at a specific coordinate on the board
+-}
 insertPiece : Piece -> BoardCoordinate -> Board -> Board
 insertPiece piece coordinate board =
     let
@@ -606,6 +610,8 @@ insertPiece piece coordinate board =
     }
 
 
+{-| Inserts a tentative piece at a specific coordinate on the board for display purposes
+-}
 insertTentativePiece : Piece -> BoardCoordinate -> Board -> Board
 insertTentativePiece piece coordinate board =
     let
@@ -619,6 +625,8 @@ insertTentativePiece piece coordinate board =
     }
 
 
+{-| Empties out displayed tentative pieces on the board
+-}
 removeTentativePieces : Board -> Board
 removeTentativePieces board =
     { board
@@ -628,11 +636,8 @@ removeTentativePieces board =
     }
 
 
-movePieceCoordinate : BoardCoordinate -> IntVector -> BoardCoordinate
-movePieceCoordinate coordinate vector =
-    { x = coordinate.x + toFloat vector.x, y = coordinate.y + toFloat vector.y }
-
-
+{-| Main function to update all piece positions on the board after each update
+-}
 updatePiecePositions : Board -> Board
 updatePiecePositions board =
     let
@@ -642,6 +647,8 @@ updatePiecePositions board =
     updatePiecePositionsRecursive coordinatePieces board
 
 
+{-| Helper function to update piece positions recursively
+-}
 updatePiecePositionsRecursive : List ( ( Float, Float ), Int, Maybe Piece ) -> Board -> Board
 updatePiecePositionsRecursive coordinatePieces board =
     case coordinatePieces of
@@ -673,50 +680,8 @@ updatePiecePositionsRecursive coordinatePieces board =
                     updatePiecePositionsRecursive rest board
 
 
-getMaxMovementCoordinate : Int -> Board -> BoardCoordinate -> IntVector -> BoardCoordinate
-getMaxMovementCoordinate pieceIndex board coordinate vector =
-    let
-        unitVector =
-            unitIntVector vector
-
-        actualNext =
-            movePieceCoordinate coordinate unitVector
-
-        isNextSpaceValid =
-            checkValidPiecePlacement actualNext (Just coordinate) board
-    in
-    if coordinate == actualNext then
-        coordinate
-
-    else if isNextSpaceValid then
-        getMaxMovementCoordinate pieceIndex (movePieceUnsafe board pieceIndex unitVector) actualNext (decreaseIntVectorMagnitude vector)
-
-    else
-        coordinate
-
-
-movePieceUnsafe : Board -> Int -> IntVector -> Board
-movePieceUnsafe board pieceIndex vector =
-    let
-        pieceCoordinate =
-            Dict.get pieceIndex board.pieceCoordinates
-    in
-    case pieceCoordinate of
-        Just coordinate ->
-            let
-                newPieceCoordinate =
-                    movePieceCoordinate coordinate vector
-            in
-            { board
-                | pieceCoordinates = Dict.insert pieceIndex newPieceCoordinate board.pieceCoordinates
-                , coordinatePieces =
-                    Dict.insert (coordinateToTuple newPieceCoordinate) pieceIndex (Dict.remove (coordinateToTuple coordinate) board.coordinatePieces)
-            }
-
-        Nothing ->
-            board
-
-
+{-| Updates a piece position on the board with some movement vector
+-}
 movePiece : Board -> Int -> IntVector -> Board
 movePiece board pieceIndex vector =
     let
@@ -752,22 +717,62 @@ movePiece board pieceIndex vector =
             board
 
 
+{-| Checks path of piece movement in a specific direction to determine limit of piece movement
+-}
+getMaxMovementCoordinate : Int -> Board -> BoardCoordinate -> IntVector -> BoardCoordinate
+getMaxMovementCoordinate pieceIndex board coordinate vector =
+    let
+        unitVector =
+            unitIntVector vector
+
+        actualNext =
+            movePieceCoordinate coordinate unitVector
+
+        isNextSpaceValid =
+            checkValidPiecePlacement actualNext (Just coordinate) board
+    in
+    if coordinate == actualNext then
+        coordinate
+
+    else if isNextSpaceValid then
+        getMaxMovementCoordinate pieceIndex (movePieceUnsafe board pieceIndex unitVector) actualNext (decreaseIntVectorMagnitude vector)
+
+    else
+        coordinate
+
+
+{-| Utility function to simulate update the position of a piece: Only use for simulation: Does not check for collision
+-}
+movePieceUnsafe : Board -> Int -> IntVector -> Board
+movePieceUnsafe board pieceIndex vector =
+    let
+        pieceCoordinate =
+            Dict.get pieceIndex board.pieceCoordinates
+    in
+    case pieceCoordinate of
+        Just coordinate ->
+            let
+                newPieceCoordinate =
+                    movePieceCoordinate coordinate vector
+            in
+            { board
+                | pieceCoordinates = Dict.insert pieceIndex newPieceCoordinate board.pieceCoordinates
+                , coordinatePieces =
+                    Dict.insert (coordinateToTuple newPieceCoordinate) pieceIndex (Dict.remove (coordinateToTuple coordinate) board.coordinatePieces)
+            }
+
+        Nothing ->
+            board
+
+
 
 {-------------------------------------------------
    Score Functions
 -------------------------------------------------}
 
 
-getFieldScore : MagneticField -> Dict Int Float
-getFieldScore field =
-    let
-        totalFieldStrength =
-            Dict.foldl (\player strength total -> total + strength) 0 field.playerStrength
-    in
-    field.playerStrength
-        |> Dict.map (\player strength -> strength / totalFieldStrength)
-
-
+{-| Gets the total score for each player based on the board state
+-}
 getBoardScores : Board -> Dict Int Float
 getBoardScores board =
     let
@@ -780,6 +785,18 @@ getBoardScores board =
         )
         playerDict
         board.magneticField
+
+
+{-| Calculates the scores for each player for a single space based on it's magnetic field
+-}
+getFieldScore : MagneticField -> Dict Int Float
+getFieldScore field =
+    let
+        totalFieldStrength =
+            Dict.foldl (\player strength total -> total + strength) 0 field.playerStrength
+    in
+    field.playerStrength
+        |> Dict.map (\player strength -> strength / totalFieldStrength)
 
 
 
@@ -795,6 +812,8 @@ type alias AIMove =
     }
 
 
+{-| Gets a list of available coordinates on the board
+-}
 getFreeCoordinates : Board -> List BoardCoordinate
 getFreeCoordinates board =
     let
@@ -809,6 +828,8 @@ getFreeCoordinates board =
     List.filter (\coordinate -> not (List.member coordinate currentTaken)) allCoordinates
 
 
+{-| Checks to see if a space on the board is free
+-}
 isSpaceFree : Board -> BoardCoordinate -> Bool
 isSpaceFree board coordinate =
     case Dict.get (coordinateToTuple coordinate) board.coordinatePieces of
@@ -820,9 +841,6 @@ isSpaceFree board coordinate =
 
 
 
-{-
-   Cell Grid Specific View Functions
--}
 {-------------------------------------------------
    View Helper Functions
 -------------------------------------------------}
@@ -971,6 +989,34 @@ getTextFromContent content =
             toPolarityIcon piece.polarity
 
 
+getTextColorFromContent : CellContent -> Color
+getTextColorFromContent content =
+    let
+        textColorFromPiece piece =
+            case piece.polarity of
+                Positive ->
+                    Color.darkCharcoal
+
+                Negative ->
+                    Color.darkGray
+
+                None ->
+                    Color.darkCharcoal
+    in
+    case content of
+        GridPiece piece ->
+            textColorFromPiece piece
+
+        NoContent ->
+            Color.black
+
+        GridMagneticField _ ->
+            Color.black
+
+        PieceOnField piece _ ->
+            textColorFromPiece piece
+
+
 cellStyle : Int -> Board -> MyCellGrid.CellStyle CellContent
 cellStyle magnetism board =
     { toCellColor = \z -> getCellColorFromContent (Dict.size board.pieces + Dict.size board.tentativePieces) magnetism z
@@ -978,6 +1024,7 @@ cellStyle magnetism board =
     , toCellOpacity = \z -> getCellOpacityFromContent 0.7 z
     , toText = \content -> getTextFromContent content
     , cellWidth = toFloat (board.config.displaySize // board.config.gridDimensions)
+    , toPieceTextColor = \content -> getTextColorFromContent content
     , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
     , gridLineColor = Color.rgb 0 0 0
     , gridLineWidth = 0

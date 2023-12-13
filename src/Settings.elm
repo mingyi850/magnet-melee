@@ -200,7 +200,7 @@ aiPickers settings =
 viewPicker : List (Html.Attribute Msg) -> String -> List (SettingPickerItem Msg) -> Html Msg
 viewPicker attributes name items =
     div [ id ("settings-picker-" ++ name) ]
-        (List.map (viewPickerItem attributes) items)
+        (List.map (viewPickerItem name attributes) items)
 
 
 {-| The function that views all settings which gets called from the Main application.

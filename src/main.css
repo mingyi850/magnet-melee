@@ -68,8 +68,8 @@ button:active {
 button.selected {
   border-bottom: 0px;
   margin-top: 4px;
-  background: #6b7280;
-  color: white;
+  background: #bbb;
+  color: #000;
 }
 
 .screen {
@@ -87,12 +87,13 @@ button.selected {
   display: flex;
   justify-content: center;
   align-items: center;
+  background: #333;
 }
 
 #settings-modal {
   padding: 1rem 2rem 2rem 2rem;
   width: 600px;
-  background: white;
+  background: #888;
   position: relative;
   border-radius: 2px;
   border: 1px solid #94a3b8;
@@ -134,7 +135,7 @@ button.selected {
 
 #settings-modal-header-team {
   font-size: 0.8em;
-  color: #777;
+  color: #222;
 }
 
 #settings-modal-intro {
@@ -153,8 +154,8 @@ button.selected {
 }
 
 .setting-picker-item-label {
-  font-size: 0.7em;
-  color: #475569;
+  font-size: 0.8em;
+  color: #111;
   margin-bottom: 3px;
   text-transform: uppercase;
 }
@@ -185,6 +186,9 @@ button.selected {
 
 .setting-picker-item-button {
   flex: 1;
+  background-color: #444;
+  color: #eee;
+
 }
 
 #settings-modal-footer {
@@ -211,6 +215,7 @@ button.selected {
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: #333;
 }
 
 #restart-button-container {
@@ -242,7 +247,7 @@ button#restart-button:active {
 #game-screen-container {
   display: flex;
   flex-direction: column;
-  background: whitesmoke;
+  background: #888;
   min-width: 640px;
   border: 1px solid #64748b;
   padding: 2rem;
@@ -283,6 +288,13 @@ button#restart-button:active {
 
 .game-board {
   align-self: start;
+  border-width: 3px;
+  border: 00px outset #64748b;
+  box-shadow: -5px 5px 10px rgba(0, 0, 0, 0.3),
+    2px -2px 4px rgba(255, 255, 255, 0.4);
+  margin-top: 50px;
+  margin-bottom: 50px;
+  margin-left: 50px;
 }
 
 .game-board>div {
@@ -293,8 +305,7 @@ button#restart-button:active {
   position: relative;
   min-width: 300px;
   flex-shrink: 2;
-  background-color: whitesmoke;
-  ;
+  margin-top: 50px;
 }
 
 .player-number {
@@ -372,7 +383,6 @@ button#restart-button:active {
   white-space: nowrap;
   justify-content: center;
   align-items: center;
-  margin: 0%;
 }
 
 .player-score-container>div {
@@ -435,4 +445,14 @@ button#restart-button:active {
   margin: 5px;
   padding-top: 5px;
   padding-bottom: 5px;
+}
+
+#settings-picker-ai {
+  display: grid;
+  grid-template-columns: 2fr 2fr;
+}
+
+#pick-choice-ai {
+  padding-left: 10px;
+  padding-right: 10px;
 }

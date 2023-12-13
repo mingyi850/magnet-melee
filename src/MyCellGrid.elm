@@ -41,6 +41,7 @@ type alias CellStyle a =
     , cellHeight : Float
     , toCellColor : a -> Color
     , toPieceColor : a -> Color
+    , toPieceTextColor : a -> Color
     , toCellOpacity : a -> Float
     , toText : a -> String
     , gridLineWidth : Float
@@ -114,7 +115,7 @@ renderPiece style position value =
             , Svg.Attributes.r (String.fromFloat style.cellWidth)
             , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
             , Svg.Attributes.fill (toCssString (style.toPieceColor value))
-            , Svg.Attributes.stroke (toCssString style.gridLineColor)
+            , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value)) --(toCssString style.gridLineColor)
             , Svg.Attributes.fillOpacity "1"
             , Svg.Attributes.z "500"
             , Mouse.onDown (onMouseDown position)
@@ -125,9 +126,11 @@ renderPiece style position value =
             , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.textAnchor "middle"
             , Svg.Attributes.alignmentBaseline "middle"
-            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth * 2))
+            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth * 2.5))
+            , Svg.Attributes.fontWeight "bold"
+            , Svg.Attributes.fontFamily "Consolas, monospace"
             , Svg.Attributes.strokeWidth (String.fromFloat (style.gridLineWidth * 2.0))
-            , Svg.Attributes.fill (toCssString Color.black)
+            , Svg.Attributes.fill (toCssString (style.toPieceTextColor value))
             , Svg.Attributes.z "1000"
             , Mouse.onDown (onMouseDown position)
             ]

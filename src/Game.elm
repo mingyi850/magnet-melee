@@ -79,7 +79,7 @@ type alias GameMoveResult =
 type alias RandomMove =
     { move : MoveData
     , seed : Seed
-    , score : Float
+    , score : Maybe Float
     }
 
 
@@ -135,7 +135,7 @@ init settings =
             , players = range 0 (settings.players - 1) |> List.map (\player -> ( player, { remainingMoves = settings.maxMoves, polarity = Negative, score = 0.0, agent = getAgentFromInt (Maybe.withDefault 0 (Array.get player settings.playerAI)) } )) |> Dict.fromList
             , playerPolarity = Negative
             , status = getInitGameStatus settings
-            , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = 0.0 }
+            , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = Nothing }
             , friction = settings.friction
             }
     in
@@ -302,10 +302,8 @@ withCmd cmd game =
     ( game, cmd )
 
 
-
-{- Get Cell Coordinates from CellGrid Click -}
-
-
+{-| Get Cell Coordinates from CellGrid Click
+-}
 determineCellCoordinates : MyCellGrid.Msg -> IntCoordinate
 determineCellCoordinates cellMsg =
     { x = cellMsg.cell.column
@@ -321,7 +319,7 @@ progressGameSuccess player game =
         , totalMoves = game.totalMoves + 1
         , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
         , status = Processing
-        , randomMove = { move = game.randomMove.move, seed = game.randomMove.seed, score = -999999.0 }
+        , randomMove = { move = game.randomMove.move, seed = game.randomMove.seed, score = Nothing }
     }
         |> withCmd (send 200.0 (UpdateBoard []))
 
@@ -347,8 +345,8 @@ updatePlayerScores players scoreDict =
         players
 
 
-updateGameBoard : Float -> Game -> Game
-updateGameBoard magnitude game =
+updateGameBoard : Game -> Game
+updateGameBoard game =
     let
         gameScores =
             getGameScore game
@@ -359,7 +357,6 @@ updateGameBoard magnitude game =
                 , players = updatePlayerScores game.players gameScores
             }
     in
-    --if newGame.board.pieceCoordinates == game.board.pieceCoordinates then
     if newGame.board.pieceCoordinates == game.board.pieceCoordinates then
         case game.status of
             Processing ->
@@ -367,7 +364,6 @@ updateGameBoard magnitude game =
 
             _ ->
                 { newGame | board = zeroPieceVelocities newGame.board }
-        -- No more changes, stop sending update message
 
     else
         newGame
@@ -379,7 +375,7 @@ simulateGameBoard steps prevGame currentGame =
         currentGame
 
     else
-        simulateGameBoard (steps - 1) currentGame (updateGameBoard 1 currentGame)
+        simulateGameBoard (steps - 1) currentGame (updateGameBoard currentGame)
 
 
 getGameStatus : Game -> GameStatus
@@ -409,8 +405,7 @@ updatePlayerPolarity player polarity game =
 
 checkGameOver : Game -> Bool
 checkGameOver game =
-    -- Check if all remaining moves for all players is 0 or less
-    if Dict.foldl (\player playerData accum -> (playerData.remainingMoves <= 0) && accum) True game.players then
+    if Dict.foldl (\_ playerData accum -> (playerData.remainingMoves <= 0) && accum) True game.players then
         True
 
     else
@@ -421,6 +416,12 @@ send : Float -> msg -> Cmd msg
 send wait msg =
     Process.sleep wait
         |> Task.perform (\_ -> msg)
+
+
+sendNow : msg -> Cmd msg
+sendNow msg =
+    Task.succeed msg
+        |> Task.perform identity
 
 
 {-| The main update function for the game, which takes an interface message and returns
@@ -454,49 +455,58 @@ update msg game =
                             ( game, Cmd.none )
 
         UpdateBoard previousStates ->
-            let
-                previousStatesCount =
-                    toFloat (List.length previousStates)
-
-                previousSameStatesCount =
-                    toFloat (List.length (List.filter (\board -> board == game.board) previousStates))
-            in
-            updateGameBoard (1 + previousStatesCount) game
+            updateGameBoard game
                 |> withDetermineUpdateCommand game previousStates
 
         GenerateAIMove num ->
             case game.status of
                 AI 0 ->
-                    { game | randomMove = generateRandomMove game }
-                        |> withCmd (send 0.0 PlayAIMove)
+                    let
+                        newMove =
+                            generateRandomMove game
+                    in
+                    case newMove.score of
+                        Just _ ->
+                            update PlayAIMove { game | randomMove = newMove }
+
+                        Nothing ->
+                            update (GenerateAIMove 0) { game | randomMove = newMove }
 
                 AI 1 ->
                     if num == 0 then
                         game
-                            |> withCmd (send 0.0 PlayAIMove)
+                            |> withCmd (sendNow PlayAIMove)
 
                     else
                         let
                             newMove =
                                 generateRandomMove game
 
-                            newMoveScore =
+                            maybeNewMoveScore =
                                 getMoveScore game.turn newMove.move game
                         in
-                        (if newMoveScore > game.randomMove.score then
-                            { game | randomMove = newMove }
+                        case maybeNewMoveScore of
+                            Just newMoveScore ->
+                                case game.randomMove.score of
+                                    Just score ->
+                                        if newMoveScore > score then
+                                            update (GenerateAIMove (num - 1)) { game | randomMove = newMove }
 
-                         else
-                            { game | randomMove = { move = game.randomMove.move, score = game.randomMove.score, seed = newMove.seed } }
-                        )
-                            |> withCmd (send 0.0 (GenerateAIMove (num - 1)))
+                                        else
+                                            update (GenerateAIMove (num - 1)) { game | randomMove = { move = game.randomMove.move, score = game.randomMove.score, seed = newMove.seed } }
+
+                                    Nothing ->
+                                        update (GenerateAIMove (num - 1)) { game | randomMove = newMove }
+
+                            Nothing ->
+                                update (GenerateAIMove num) { game | randomMove = newMove }
 
                 _ ->
                     ( game, Cmd.none )
 
         PlayAIMove ->
             case game.status of
-                AI x ->
+                AI _ ->
                     let
                         aiMove =
                             game.randomMove.move
@@ -518,9 +528,9 @@ alwaysCommand msg { game, status } =
     ( game, msg )
 
 
-getMoveScore : Int -> MoveData -> Game -> Float
+getMoveScore : Int -> MoveData -> Game -> Maybe Float
 getMoveScore player move game =
-    if isSpaceFree game.board (intCoordinateToFloat { x = move.x, y = move.y }) then
+    if checkValidPiecePlacement (intCoordinateToFloat { x = move.x, y = move.y }) Nothing game.board then
         let
             newGame =
                 { game | board = insertPiece { player = player, polarity = move.polarity } (intCoordinateToFloat { x = move.x, y = move.y }) game.board }
@@ -528,37 +538,10 @@ getMoveScore player move game =
             simulatedGame =
                 simulateGameBoard 20 game newGame
         in
-        getAvgScoreMargin player simulatedGame
+        Just (getAvgScoreMargin player simulatedGame)
 
     else
-        -999999.0
-
-
-getAIMoveGreedy : Game -> MoveData
-getAIMoveGreedy game =
-    let
-        freeCoordinates =
-            List.map (\coordinate -> floatCoordinateToInt coordinate) (getFreeCoordinates game.board)
-
-        possibleMoves =
-            List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Positive }) freeCoordinates
-                ++ List.map (\coordinate -> { x = coordinate.x, y = coordinate.y, polarity = Negative }) freeCoordinates
-    in
-    getBestMove game possibleMoves
-
-
-getBestMove : Game -> List MoveData -> MoveData
-getBestMove game movesList =
-    List.map
-        (\move ->
-            { move = move, score = getMoveScore game.turn move game }
-        )
-        movesList
-        |> List.sortBy (\move -> move.score)
-        |> List.reverse
-        |> List.head
-        |> Maybe.map (\move -> move.move)
-        |> Maybe.withDefault { x = game.randomMove.move.x, y = game.randomMove.move.y, polarity = game.randomMove.move.polarity }
+        Nothing
 
 
 withDetermineUpdateCommand : Game -> List Board -> Game -> ( Game, Cmd Msg )
@@ -570,7 +553,7 @@ determineUpdateCommand : Game -> List Board -> Game -> Cmd Msg
 determineUpdateCommand previousGame previousStates game =
     case game.status of
         Processing ->
-            send 0.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
+            send 50.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
 
         AI 0 ->
             send 100.0 (GenerateAIMove 0)
@@ -621,7 +604,7 @@ polarityPickChoiceConfig2 player game =
 
 viewPolaritySelector : Game -> PickChoiceButtonsConfig Msg -> Html Msg
 viewPolaritySelector game data =
-    viewPickerItem [ Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
+    viewPickerItem "polarity-selector" [ Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
 
 
 getPlayerContainers : Game -> List (Html Msg)
@@ -676,7 +659,16 @@ playerNumContainer game playerNum =
     div [ id "num-container", class "player-number-container" ]
         [ div [ id "player-color", class "player-color-indicator" ]
             [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width (px (60 - (10 * Dict.size game.players))), Svg.Attributes.height (px (60 - (10 * Dict.size game.players))) ]
-                [ Svg.circle [ Svg.Attributes.cx "50%", Svg.Attributes.cy "50%", Svg.Attributes.r "50%", Svg.Attributes.fill (toCssString (getPieceColor { player = playerNum, polarity = None })) ] [] ]
+                [ Svg.circle
+                    [ Svg.Attributes.cx "50%"
+                    , Svg.Attributes.cy "50%"
+                    , Svg.Attributes.r "45%"
+                    , Svg.Attributes.fill (toCssString (getPieceColor { player = playerNum, polarity = None }))
+                    , Svg.Attributes.stroke "black"
+                    , Svg.Attributes.strokeWidth "10"
+                    ]
+                    []
+                ]
             ]
         , h1 [ id "player-num", class "player-number", Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ]
             [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]

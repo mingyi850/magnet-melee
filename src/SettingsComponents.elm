@@ -246,8 +246,8 @@ current settings in this function (as Settings) so can use that
 information to make decisions on what to render as well.
 
 -}
-viewPickerItem : List (Html.Attribute a) -> SettingPickerItem a -> Html a
-viewPickerItem attributes item =
+viewPickerItem : String -> List (Html.Attribute a) -> SettingPickerItem a -> Html a
+viewPickerItem name attributes item =
     case item of
         InputString data ->
             div (class "setting-picker-item" :: attributes)
@@ -306,7 +306,7 @@ viewPickerItem attributes item =
                 [ label [ class "setting-picker-item-label" ] [ text data.label ]
                 , div [ class "setting-picker-item-input-container" ]
                     [ input
-                        [ class "setting-picker-item-input setting-picker-item-input-int-range"
+                        [ class "setting-picker-item-input-int-range"
                         , type_ "range"
                         , value (String.fromInt data.value)
                         , Html.Attributes.min (String.fromInt data.min)
@@ -319,13 +319,14 @@ viewPickerItem attributes item =
                 ]
 
         PickChoiceButtons data ->
-            div (class "setting-picker-item" :: attributes)
+            div (id ("pick-choice-" ++ name) :: class "setting-picker-item" :: attributes)
                 [ label [ class "setting-picker-item-label" ] [ text data.label ]
-                , div [ class "setting-picker-item-input setting-picker-item-input-buttons" ]
+                , div [ class "setting-picker-item-input-buttons" ]
                     (List.map
                         (\{ label, onSelect, isSelected } ->
                             button
-                                [ class ("setting-picker-item-button setting-picker-item-button-" ++ String.replace " " "-" label)
+                                [ class "setting-picker-item-button"
+                                , id ("setting-picker-item-button-" ++ String.replace " " "-" label)
                                 , classList [ ( "selected", isSelected ) ]
                                 , onClick onSelect
                                 ]
@@ -338,7 +339,7 @@ viewPickerItem attributes item =
         PickChoiceDropdown data ->
             div (class "setting-picker-item" :: attributes)
                 [ label [ class "setting-picker-item-label" ] [ text data.label ]
-                , select [ class "setting-picker-item-input setting-picker-item-input-select", onInput data.onSelect ]
+                , select [ class "setting-picker-item-input-select", onInput data.onSelect ]
                     (List.map
                         (\optionData ->
                             option [ value optionData.value, selected optionData.isSelected ] [ text optionData.label ]

@@ -1,4 +1,4 @@
-module Physics exposing (..)
+module PhysicsUtils exposing (..)
 
 import Utils exposing (..)
 import VectorUtils exposing (..)
@@ -137,3 +137,8 @@ calculateCollisionNormal position1 position2 =
             { x = directionVector.x / magnitude, y = directionVector.y / magnitude }
     in
     collisionNormal
+
+
+movePieceCoordinate : PCoordinate -> IntVector -> PCoordinate
+movePieceCoordinate coordinate vector =
+    { x = coordinate.x + toFloat vector.x, y = coordinate.y + toFloat vector.y }

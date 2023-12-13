@@ -197,3 +197,13 @@ decreaseIntVectorMagnitude vector =
                 vector.y + 1
     in
     { x = newX, y = newY }
+
+
+combineMaybeVectors : FloatVector -> Maybe FloatVector -> FloatVector
+combineMaybeVectors vector maybeVector =
+    case maybeVector of
+        Just v ->
+            combineVectors vector v
+
+        Nothing ->
+            vector
