@@ -216,7 +216,7 @@ applyMove move game =
                 { status = Success, game = { game | board = insertTentativePiece { player = game.turn, polarity = polarity } (intCoordinateToFloat coordinate) game.board |> updateBoardMagneticField game.magnetism } }
 
             else
-                { status = Failure, game = game }
+                { status = Failure, game = { game | board = removeTentativePieces game.board |> updateBoardMagneticField game.magnetism } }
 
 
 generateRandomMove : Game -> RandomMove
@@ -316,6 +316,8 @@ determineCellCoordinates game cellMsg =
     boardCoordinate
 
 
+{-| Progress game state after a successful move
+-}
 progressGameSuccess : Int -> Game -> ( Game, Cmd Msg )
 progressGameSuccess player game =
     { game
@@ -329,6 +331,8 @@ progressGameSuccess player game =
         |> withCmd (send 200.0 (UpdateBoard []))
 
 
+{-| Utility Function to used to decide next action based on game state
+-}
 processMoveResult : Int -> (Int -> Game -> ( Game, Cmd Msg )) -> (Int -> Game -> ( Game, Cmd Msg )) -> GameMoveResult -> ( Game, Cmd Msg )
 processMoveResult player onSuccess onFailure moveResult =
     case moveResult.status of
@@ -339,6 +343,8 @@ processMoveResult player onSuccess onFailure moveResult =
             onFailure player moveResult.game
 
 
+{-| Calls board API to get board score
+-}
 updatePlayerScores : Dict Int Player -> Dict Int Float -> Dict Int Player
 updatePlayerScores players scoreDict =
     Dict.map
@@ -350,6 +356,8 @@ updatePlayerScores players scoreDict =
         players
 
 
+{-| Updates the state of the game board
+-}
 updateGameBoard : Game -> Game
 updateGameBoard game =
     let
@@ -374,6 +382,8 @@ updateGameBoard game =
         newGame
 
 
+{-| Simulates the game board for a given number of steps
+-}
 simulateGameBoard : Int -> Game -> Game -> Game
 simulateGameBoard steps prevGame currentGame =
     if steps <= 0 || prevGame == currentGame then
@@ -383,6 +393,8 @@ simulateGameBoard steps prevGame currentGame =
         simulateGameBoard (steps - 1) currentGame (updateGameBoard currentGame)
 
 
+{-| Get current game status
+-}
 getGameStatus : Game -> GameStatus
 getGameStatus game =
     if checkGameOver game then
@@ -400,6 +412,8 @@ getGameStatus game =
                 AI 1
 
 
+{-| Updates the polarity of a player from the game screen
+-}
 updatePlayerPolarity : Int -> Polarity -> Game -> Game
 updatePlayerPolarity player polarity game =
     { game
@@ -408,6 +422,8 @@ updatePlayerPolarity player polarity game =
     }
 
 
+{-| Checks game over condition
+-}
 checkGameOver : Game -> Bool
 checkGameOver game =
     if Dict.foldl (\_ playerData accum -> (playerData.remainingMoves <= 0) && accum) True game.players then
@@ -417,12 +433,16 @@ checkGameOver game =
         False
 
 
+{-| Sends a message to the Elm runtime with some delay
+-}
 send : Float -> msg -> Cmd msg
 send wait msg =
     Process.sleep wait
         |> Task.perform (\_ -> msg)
 
 
+{-| Sends a message to the Elm runtime without delay
+-}
 sendNow : msg -> Cmd msg
 sendNow msg =
     Task.succeed msg
@@ -533,16 +553,22 @@ update msg game =
                     ( game, Cmd.none )
 
 
+{-| Sends a message to the Elm runtime to fetch a move from the AI
+-}
 sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
 sendGetAIMove player game =
     ( game, send 200.0 (GenerateAIMove 1) )
 
 
+{-| Utility function to always send a specific message regardless of game move status
+-}
 alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
 alwaysCommand msg { game, status } =
     ( game, msg )
 
 
+{-| Utility function to evaluate an AI's move
+-}
 getMoveScore : Int -> MoveData -> Game -> Maybe Float
 getMoveScore player move game =
     if checkValidPiecePlacement (intCoordinateToFloat { x = move.x, y = move.y }) Nothing game.board then
@@ -559,11 +585,15 @@ getMoveScore player move game =
         Nothing
 
 
+{-| Attaches update command to game based on game state
+-}
 withDetermineUpdateCommand : Game -> List Board -> Game -> ( Game, Cmd Msg )
 withDetermineUpdateCommand prevGame previousStates game =
     withCmd (determineUpdateCommand prevGame previousStates game) game
 
 
+{-| Determines update c ommand based on game state
+-}
 determineUpdateCommand : Game -> List Board -> Game -> Cmd Msg
 determineUpdateCommand previousGame previousStates game =
     case game.status of
@@ -618,8 +648,8 @@ getBoardView game =
         )
 
 
-polarityPickChoiceConfig2 : Int -> Game -> PickChoiceButtonsConfig Msg
-polarityPickChoiceConfig2 player game =
+polarityPickChoiceConfig : Int -> Game -> PickChoiceButtonsConfig Msg
+polarityPickChoiceConfig player game =
     { label = "Polarity"
     , options =
         [ { label = "+", onSelect = UpdatePlayerPolarity player Positive, isSelected = getPlayerPolarity player game == Positive }
@@ -736,9 +766,7 @@ playerContainer playerNum player game =
     div [ id "player-info", class "player-container" ]
         [ playerNumContainer game playerNum
         , div [ class "player-moves-container", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
-        , viewPolaritySelector game (polarityPickChoiceConfig2 playerNum game)
-
-        --, div [ class "player-polarity-container" ] [ div [ id "polarity-selector" ] [ Html.text ("Polarity: " ++ toPolarityString player.polarity) ] ]
+        , viewPolaritySelector game (polarityPickChoiceConfig playerNum game)
         , div [ class "player-score-box" ]
             [ div [ id "score-box", Html.Attributes.style "font-size" (px (30 - (3 * Dict.size game.players))) ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
         ]
