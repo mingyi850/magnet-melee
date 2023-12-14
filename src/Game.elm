@@ -669,7 +669,7 @@ polarityPickChoiceConfig player game =
 
 viewPolaritySelector : Game -> PickChoiceButtonsConfig Msg -> Html Msg
 viewPolaritySelector game data =
-    viewPickerItem "polarity-selector" [ Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
+    viewPickerItem "polarity-selector" [ Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))), Html.Attributes.style "color" "#ccc" ] (PickChoiceButtons data)
 
 
 getPlayerContainers : Game -> List (Html Msg)
@@ -755,8 +755,8 @@ playerNumContainer isHeader game playerNum =
                     , Svg.Attributes.cy "50%"
                     , Svg.Attributes.r "45%"
                     , Svg.Attributes.fill (toCssString (getPieceColor { player = playerNum, polarity = None }))
-                    , Svg.Attributes.stroke "black"
-                    , Svg.Attributes.strokeWidth "10"
+                    , Svg.Attributes.stroke "#777"
+                    , Svg.Attributes.strokeWidth "5"
                     ]
                     []
                 ]
@@ -813,7 +813,16 @@ getTurnDisplay status game =
 
 view : Game -> Html Msg
 view game =
-    div [ id "game-screen-container" ]
+    let
+        backgroundCol =
+            case game.status of
+                GameOver ->
+                    "#333"
+
+                _ ->
+                    "#333"
+    in
+    div [ id "game-screen-container", Html.Attributes.style "background-color" backgroundCol, Html.Attributes.style "color" "#ccc" ]
         [ getTurnDisplay game.status game
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game

@@ -153,7 +153,6 @@ button:active {
 
 .setting-picker-item-label {
   font-size: 0.8em;
-  color: #111;
   margin-bottom: 3px;
   text-transform: uppercase;
 }
@@ -253,11 +252,11 @@ button#restart-button:active {
 #game-screen-container {
   display: flex;
   flex-direction: column;
-  background: #888;
+  background: #333;
   min-width: 640px;
-  border: 1px solid #64748b;
+  border: 0px solid #64748b;
   padding: 2rem;
-  border: 1px solid
+  border: 0px solid
 }
 
 #counter-value {
@@ -371,7 +370,7 @@ button#restart-button:active {
   justify-content: center;
   margin-left: 0px;
   gap: 0px;
-  background-color: #999;
+  background-color: #222;
   border-width: 3px;
   border: 3px solid #666;
   border-radius: 20px;

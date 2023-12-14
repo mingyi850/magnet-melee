@@ -1015,7 +1015,7 @@ getCellColorFromContent totalPieces magnetism content =
             Color.fromRgba { red = 0, blue = 0, green = 0, alpha = 0.3 }
 
         DarkZone _ 2 ->
-            Color.fromRgba { red = 0, blue = 0, green = 0, alpha = 0.1 }
+            Color.fromRgba { red = 0, blue = 0, green = 0, alpha = 0.15 }
 
         DarkZone _ _ ->
             Color.white
