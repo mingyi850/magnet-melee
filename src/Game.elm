@@ -67,6 +67,7 @@ type alias Game =
     , status : GameStatus
     , randomMove : RandomMove
     , friction : Float
+    , padding : Int
     }
 
 
@@ -137,6 +138,7 @@ init settings =
             , status = getInitGameStatus settings
             , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = Nothing }
             , friction = settings.friction
+            , padding = settings.padding
             }
     in
     initialGame |> (\game -> withDetermineUpdateCommand game [] game)
@@ -304,11 +306,13 @@ withCmd cmd game =
 
 {-| Get Cell Coordinates from CellGrid Click
 -}
-determineCellCoordinates : MyCellGrid.Msg -> IntCoordinate
-determineCellCoordinates cellMsg =
-    { x = cellMsg.cell.column
-    , y = cellMsg.cell.row
-    }
+determineCellCoordinates : Game -> MyCellGrid.Msg -> Maybe IntCoordinate
+determineCellCoordinates game cellMsg =
+    let
+        boardCoordinate =
+            mapViewCoordinateToBoard game.padding game.gridSize { x = cellMsg.cell.column, y = cellMsg.cell.row }
+    in
+    boardCoordinate
 
 
 progressGameSuccess : Int -> Game -> ( Game, Cmd Msg )
@@ -442,14 +446,24 @@ update msg game =
                         HumanMove ->
                             case cellmsg.interaction of
                                 Click ->
-                                    game
-                                        |> applyMove (PlacePiece (determineCellCoordinates cellmsg) (getPlayerPolarity game.turn game))
-                                        |> processMoveResult game.turn progressGameSuccess (\_ _ -> ( game, Cmd.none ))
+                                    case determineCellCoordinates game cellmsg of
+                                        Just coordinate ->
+                                            game
+                                                |> applyMove (PlacePiece coordinate (getPlayerPolarity game.turn game))
+                                                |> processMoveResult game.turn progressGameSuccess (\_ _ -> ( game, Cmd.none ))
+
+                                        Nothing ->
+                                            ( game, Cmd.none )
 
                                 Hover ->
-                                    game
-                                        |> applyMove (DisplayPiece (determineCellCoordinates cellmsg) (getPlayerPolarity game.turn game))
-                                        |> alwaysCommand Cmd.none
+                                    case determineCellCoordinates game cellmsg of
+                                        Just coordinate ->
+                                            game
+                                                |> applyMove (DisplayPiece coordinate (getPlayerPolarity game.turn game))
+                                                |> alwaysCommand Cmd.none
+
+                                        Nothing ->
+                                            ( game, Cmd.none )
 
                         _ ->
                             ( game, Cmd.none )
@@ -579,8 +593,19 @@ can be sent from.
 -}
 getBoardConfig : Settings -> BoardConfig
 getBoardConfig settings =
-    { displaySize = Basics.max 600 settings.gridSize
+    let
+        padding =
+            settings.padding
+
+        gridSize =
+            settings.gridSize
+
+        cellSize =
+            600 // settings.gridSize
+    in
+    { displaySize = cellSize * (gridSize + padding * 2)
     , gridDimensions = settings.gridSize
+    , padding = settings.padding
     }
 
 
@@ -588,7 +613,7 @@ getBoardView : Game -> Html Msg
 getBoardView game =
     Html.map ModelMsg
         (div [ id "board-container", class "game-board" ]
-            [ boardHtml game.magnetism game.board ]
+            [ boardHtml game.padding game.magnetism game.board ]
         )
 
 

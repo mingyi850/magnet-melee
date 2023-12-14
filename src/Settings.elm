@@ -53,6 +53,7 @@ type alias Settings =
     , players : Int
     , playerAI : Array Int
     , time : Int
+    , padding : Int
     }
 
 
@@ -70,6 +71,7 @@ default =
     , players = 2
     , playerAI = Array.repeat 2 0
     , time = 0
+    , padding = 2
     }
 
 

@@ -42,6 +42,7 @@ type alias CellStyle a =
     , toCellColor : a -> Color
     , toPieceColor : a -> Color
     , toPieceTextColor : a -> Color
+    , toPieceScale : a -> Float
     , toCellOpacity : a -> Float
     , toText : a -> String
     , gridLineWidth : Float
@@ -112,7 +113,7 @@ renderPiece style position value =
         [ Svg.circle
             [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-            , Svg.Attributes.r (String.fromFloat style.cellWidth)
+            , Svg.Attributes.r (String.fromFloat (style.cellWidth * style.toPieceScale value))
             , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
             , Svg.Attributes.fill (toCssString (style.toPieceColor value))
             , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value)) --(toCssString style.gridLineColor)

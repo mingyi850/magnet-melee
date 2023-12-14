@@ -97,6 +97,8 @@ type alias Board =
     , tentativePieceCoordinates : Dict Int BoardCoordinate
     , tentativeCoordinatePieces : Dict ( Float, Float ) Int
     , pieceVelocities : Dict Int FloatVector
+    , deadPieces : Dict ( Int, Int ) Piece
+    , padding : Int
     }
 
 
@@ -115,6 +117,7 @@ type alias IntCoordinate =
 type alias BoardConfig =
     { gridDimensions : Int
     , displaySize : Int
+    , padding : Int
     }
 
 
@@ -123,6 +126,7 @@ type CellContent
     | NoContent
     | GridMagneticField MagneticField
     | PieceOnField Piece MagneticField
+    | DarkZone (Maybe Piece) Int
 
 
 
@@ -257,6 +261,8 @@ emptyBoard boardConfig =
     , tentativePieceCoordinates = Dict.empty
     , tentativeCoordinatePieces = Dict.empty
     , pieceVelocities = Dict.empty
+    , deadPieces = Dict.empty
+    , padding = boardConfig.padding
     }
 
 
@@ -297,6 +303,11 @@ getTentativePieceFromCoordinate board coordinate =
                 |> Dict.get (coordinateToTuple coordinate)
     in
     Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
+
+
+getDeadPieceFromCoordinate : Board -> IntCoordinate -> Maybe Piece
+getDeadPieceFromCoordinate board coordinate =
+    Dict.get (intCoordinateToTuple coordinate) board.deadPieces
 
 
 coordinateOnBoard : BoardCoordinate -> Board -> Bool
@@ -705,16 +716,84 @@ movePiece board pieceIndex vector =
                 }
 
             else
-                { board
-                    | pieceCoordinates = Dict.remove pieceIndex board.pieceCoordinates
-                    , coordinatePieces =
-                        Dict.remove (coordinateToTuple coordinate) board.coordinatePieces
-                    , pieces = Dict.remove pieceIndex board.pieces
-                    , pieceVelocities = Dict.remove pieceIndex board.pieceVelocities
-                }
+                case Dict.get pieceIndex board.pieces of
+                    Just piece ->
+                        { board
+                            | pieceCoordinates = Dict.remove pieceIndex board.pieceCoordinates
+                            , coordinatePieces =
+                                Dict.remove (coordinateToTuple coordinate) board.coordinatePieces
+                            , pieces = Dict.remove pieceIndex board.pieces
+                            , pieceVelocities = Dict.remove pieceIndex board.pieceVelocities
+                            , deadPieces = Dict.insert (intCoordinateToTuple (getNearestViewCoordinateToDeadPiece board newCoordinate)) piece board.deadPieces
+                        }
+
+                    Nothing ->
+                        board
 
         Nothing ->
             board
+
+
+getNearestViewCoordinateToDeadPiece : Board -> BoardCoordinate -> IntCoordinate
+getNearestViewCoordinateToDeadPiece board coordinate =
+    let
+        padding =
+            board.padding
+
+        isRight =
+            coordinate.x >= toFloat board.config.gridDimensions
+
+        isLeft =
+            coordinate.x < 0
+
+        isBottom =
+            coordinate.y >= toFloat board.config.gridDimensions
+
+        isTop =
+            coordinate.y < 0
+
+        nearestX =
+            if isRight then
+                board.config.gridDimensions + padding + (padding // 2)
+
+            else if isLeft then
+                padding - (padding // 2 + 1)
+
+            else
+                Basics.round coordinate.x + padding
+
+        nearestY =
+            if isBottom then
+                board.config.gridDimensions + padding + (padding // 2)
+
+            else if isTop then
+                padding - (padding // 2 + 1)
+
+            else
+                Basics.round coordinate.y + padding
+
+        taken =
+            getDeadPieceFromCoordinate board { x = nearestX, y = nearestY }
+    in
+    case taken of
+        Nothing ->
+            { x = nearestX, y = nearestY }
+
+        Just _ ->
+            if isRight then
+                { x = nearestX - 1, y = nearestY }
+
+            else if isLeft then
+                { x = nearestX + 1, y = nearestY }
+
+            else if isBottom then
+                { x = nearestX, y = nearestY - 1 }
+
+            else if isTop then
+                { x = nearestX, y = nearestY + 1 }
+
+            else
+                { x = nearestX, y = nearestY }
 
 
 {-| Checks path of piece movement in a specific direction to determine limit of piece movement
@@ -846,29 +925,25 @@ isSpaceFree board coordinate =
 -------------------------------------------------}
 
 
-determineCellContent : Dict ( Int, Int ) MagneticField -> Board -> IntCoordinate -> CellContent
-determineCellContent magneticField board coordinate =
+determineCellContent : Int -> Dict ( Int, Int ) MagneticField -> Board -> IntCoordinate -> CellContent
+determineCellContent padding magneticField board coordinate =
     let
-        piece =
-            getPieceFromCoordinate board (intCoordinateToFloat coordinate)
-
-        tentativePiece =
-            getTentativePieceFromCoordinate board (intCoordinateToFloat coordinate)
-
-        field =
-            Dict.get (intCoordinateToTuple coordinate) magneticField
+        boardCoordinates =
+            mapViewCoordinateToBoard padding board.config.gridDimensions coordinate
     in
-    case piece of
-        Just p ->
-            case field of
-                Just f ->
-                    PieceOnField p f
+    case boardCoordinates of
+        Just boardCoord ->
+            let
+                piece =
+                    getPieceFromCoordinate board (intCoordinateToFloat boardCoord)
 
-                Nothing ->
-                    GridPiece p
+                tentativePiece =
+                    getTentativePieceFromCoordinate board (intCoordinateToFloat boardCoord)
 
-        Nothing ->
-            case tentativePiece of
+                field =
+                    Dict.get (intCoordinateToTuple boardCoord) magneticField
+            in
+            case piece of
                 Just p ->
                     case field of
                         Just f ->
@@ -878,22 +953,72 @@ determineCellContent magneticField board coordinate =
                             GridPiece p
 
                 Nothing ->
-                    case field of
-                        Just f ->
-                            GridMagneticField f
+                    case tentativePiece of
+                        Just p ->
+                            case field of
+                                Just f ->
+                                    PieceOnField p f
+
+                                Nothing ->
+                                    GridPiece p
 
                         Nothing ->
-                            NoContent
+                            case field of
+                                Just f ->
+                                    GridMagneticField f
+
+                                Nothing ->
+                                    NoContent
+
+        Nothing ->
+            case getDeadPieceFromCoordinate board coordinate of
+                Just p ->
+                    DarkZone
+                        (Just p)
+                        (getDarkZoneDegree padding board coordinate)
+
+                Nothing ->
+                    DarkZone Nothing (getDarkZoneDegree padding board coordinate)
 
 
-getCellGrid : Board -> CellGrid CellContent
-getCellGrid board =
-    CellGrid.initialize (Dimensions board.config.gridDimensions board.config.gridDimensions) (\i j -> determineCellContent board.magneticField board { x = j, y = i })
+getDarkZoneDegree : Int -> Board -> IntCoordinate -> Int
+getDarkZoneDegree padding board coordinate =
+    let
+        xDegree =
+            if coordinate.x < padding then
+                abs (padding - coordinate.x)
+
+            else if coordinate.x >= board.config.gridDimensions + padding then
+                abs (coordinate.x - (board.config.gridDimensions + padding - 1))
+
+            else
+                0
+
+        yDegree =
+            if coordinate.y < padding then
+                abs (padding - coordinate.y)
+
+            else if coordinate.y >= board.config.gridDimensions + padding then
+                abs (coordinate.y - (board.config.gridDimensions + padding - 1))
+
+            else
+                0
+    in
+    Basics.max xDegree yDegree
 
 
-boardHtml : Int -> Board -> Html Msg
-boardHtml magnetism board =
-    Html.map CellGridMessage (MyCellGrid.asHtml { width = board.config.displaySize, height = board.config.displaySize } (cellStyle magnetism board) (getCellGrid board))
+getCellGrid : Int -> Board -> CellGrid CellContent
+getCellGrid padding board =
+    let
+        gridDimensions =
+            board.config.gridDimensions + padding * 2
+    in
+    CellGrid.initialize (Dimensions gridDimensions gridDimensions) (\i j -> determineCellContent padding board.magneticField board { x = j, y = i })
+
+
+boardHtml : Int -> Int -> Board -> Html Msg
+boardHtml padding magnetism board =
+    Html.map CellGridMessage (MyCellGrid.asHtml { width = board.config.displaySize, height = board.config.displaySize } (cellStyle padding magnetism board) (getCellGrid padding board))
 
 
 getCellColorFromContent : Int -> Int -> CellContent -> Color.Color
@@ -911,6 +1036,15 @@ getCellColorFromContent totalPieces magnetism content =
         PieceOnField piece field ->
             getPieceColor piece
 
+        DarkZone _ 1 ->
+            Color.fromRgba { red = 0, blue = 0, green = 0, alpha = 0.3 }
+
+        DarkZone _ 2 ->
+            Color.fromRgba { red = 0, blue = 0, green = 0, alpha = 0.1 }
+
+        DarkZone _ _ ->
+            Color.white
+
 
 getCellOpacityFromContent : Float -> CellContent -> Float
 getCellOpacityFromContent opacity content =
@@ -926,6 +1060,9 @@ getCellOpacityFromContent opacity content =
 
         PieceOnField _ field ->
             1 - (opacity ^ toFloat (Dict.size field.playerStrength))
+
+        DarkZone _ _ ->
+            1
 
 
 getMagneticFieldColorWinner : Int -> Int -> MagneticField -> Color.Color
@@ -969,8 +1106,27 @@ getPieceColorFromContent content =
         PieceOnField piece _ ->
             getPieceColor piece
 
+        DarkZone (Just piece) _ ->
+            getPieceColor piece
+
         _ ->
             Color.white
+
+
+getPieceScaleFromContent : CellContent -> Float
+getPieceScaleFromContent content =
+    case content of
+        GridPiece piece ->
+            1.0
+
+        PieceOnField piece _ ->
+            1.0
+
+        DarkZone (Just piece) _ ->
+            0.65
+
+        _ ->
+            1.0
 
 
 getTextFromContent : CellContent -> String
@@ -987,6 +1143,12 @@ getTextFromContent content =
 
         PieceOnField piece field ->
             toPolarityIcon piece.polarity
+
+        DarkZone (Just p) _ ->
+            toPolarityIcon p.polarity
+
+        DarkZone Nothing _ ->
+            ""
 
 
 getTextColorFromContent : CellContent -> Color
@@ -1016,16 +1178,44 @@ getTextColorFromContent content =
         PieceOnField piece _ ->
             textColorFromPiece piece
 
+        DarkZone (Just p) _ ->
+            textColorFromPiece p
 
-cellStyle : Int -> Board -> MyCellGrid.CellStyle CellContent
-cellStyle magnetism board =
+        DarkZone Nothing _ ->
+            Color.black
+
+
+mapViewCoordinateToBoard : Int -> Int -> IntCoordinate -> Maybe IntCoordinate
+mapViewCoordinateToBoard padding boardSize viewCoordinate =
+    let
+        newX =
+            viewCoordinate.x - padding
+
+        newY =
+            viewCoordinate.y - padding
+    in
+    if newX >= 0 && newY >= 0 && newX < boardSize && newY < boardSize then
+        Just { x = newX, y = newY }
+
+    else
+        Nothing
+
+
+mapBoardCoordinateToView : Int -> IntCoordinate -> IntCoordinate
+mapBoardCoordinateToView padding coordinate =
+    { x = coordinate.x + padding, y = coordinate.y + padding }
+
+
+cellStyle : Int -> Int -> Board -> MyCellGrid.CellStyle CellContent
+cellStyle padding magnetism board =
     { toCellColor = \z -> getCellColorFromContent (Dict.size board.pieces + Dict.size board.tentativePieces) magnetism z
     , toPieceColor = \z -> getPieceColorFromContent z
+    , toPieceScale = \z -> getPieceScaleFromContent z
     , toCellOpacity = \z -> getCellOpacityFromContent 0.7 z
     , toText = \content -> getTextFromContent content
-    , cellWidth = toFloat (board.config.displaySize // board.config.gridDimensions)
+    , cellWidth = toFloat (board.config.displaySize // (board.config.gridDimensions + 2 * padding))
     , toPieceTextColor = \content -> getTextColorFromContent content
-    , cellHeight = toFloat (board.config.displaySize // board.config.gridDimensions)
+    , cellHeight = toFloat (board.config.displaySize // (board.config.gridDimensions + 2 * padding))
     , gridLineColor = Color.rgb 0 0 0
     , gridLineWidth = 0
     , pieceLineWidth = toFloat (board.config.displaySize // board.config.gridDimensions) / 10
@@ -1036,6 +1226,9 @@ cellStyle magnetism board =
                     True
 
                 PieceOnField _ _ ->
+                    True
+
+                DarkZone (Just p) _ ->
                     True
 
                 _ ->
