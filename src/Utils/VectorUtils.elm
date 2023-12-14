@@ -1,4 +1,4 @@
-module VectorUtils exposing (..)
+module Utils.VectorUtils exposing (..)
 
 
 type alias FloatVector =
@@ -16,6 +16,21 @@ type alias IntVector =
 negative : FloatVector -> FloatVector
 negative vector =
     { x = -vector.x, y = -vector.y }
+
+
+negativeIntVec : IntVector -> IntVector
+negativeIntVec vector =
+    { x = -vector.x, y = -vector.y }
+
+
+addFloatVectors : FloatVector -> FloatVector -> FloatVector
+addFloatVectors vector1 vector2 =
+    { x = vector1.x + vector2.x, y = vector1.y + vector2.y }
+
+
+vectorMagnitude : FloatVector -> Float
+vectorMagnitude vector =
+    sqrt (vector.x * vector.x + vector.y * vector.y)
 
 
 unit : FloatVector -> IntVector
@@ -44,8 +59,39 @@ unit vector =
     { x = x, y = y }
 
 
+multiplyVector : Float -> FloatVector -> FloatVector
+multiplyVector scale vector =
+    { x = vector.x * scale, y = vector.y * scale }
+
+
 scaledUnit : Int -> FloatVector -> IntVector
 scaledUnit scale vector =
+    let
+        x =
+            if vector.x == 0 then
+                0
+
+            else if vector.x > 0 then
+                scale
+
+            else
+                -scale
+
+        y =
+            if vector.y == 0 then
+                0
+
+            else if vector.y > 0 then
+                scale
+
+            else
+                -scale
+    in
+    { x = x, y = y }
+
+
+scaledIntUnit : Int -> IntVector -> IntVector
+scaledIntUnit scale vector =
     let
         x =
             if vector.x == 0 then
@@ -151,3 +197,13 @@ decreaseIntVectorMagnitude vector =
                 vector.y + 1
     in
     { x = newX, y = newY }
+
+
+combineMaybeVectors : FloatVector -> Maybe FloatVector -> FloatVector
+combineMaybeVectors vector maybeVector =
+    case maybeVector of
+        Just v ->
+            combineVectors vector v
+
+        Nothing ->
+            vector

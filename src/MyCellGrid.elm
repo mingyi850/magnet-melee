@@ -41,9 +41,12 @@ type alias CellStyle a =
     , cellHeight : Float
     , toCellColor : a -> Color
     , toPieceColor : a -> Color
+    , toPieceTextColor : a -> Color
+    , toPieceScale : a -> Float
     , toCellOpacity : a -> Float
     , toText : a -> String
     , gridLineWidth : Float
+    , pieceLineWidth : Float
     , gridLineColor : Color
     , shouldRenderPiece : a -> Bool
     }
@@ -104,19 +107,30 @@ onMouseDown position =
         { cell = position, coordinates = { x = x, y = y }, interaction = Click }
 
 
+onMouseHover : Position -> Mouse.Event -> Msg
+onMouseHover position =
+    \r ->
+        let
+            ( x, y ) =
+                r.clientPos
+        in
+        { cell = position, coordinates = { x = x, y = y }, interaction = Hover }
+
+
 renderPiece : CellStyle a -> Position -> a -> List (Svg Msg)
 renderPiece style position value =
     if style.shouldRenderPiece value then
         [ Svg.circle
             [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-            , Svg.Attributes.r (String.fromFloat (style.cellWidth / 2.5))
-            , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
+            , Svg.Attributes.r (String.fromFloat (style.cellWidth * style.toPieceScale value))
+            , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
             , Svg.Attributes.fill (toCssString (style.toPieceColor value))
-            , Svg.Attributes.stroke (toCssString style.gridLineColor)
+            , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
             , Svg.Attributes.fillOpacity "1"
             , Svg.Attributes.z "500"
             , Mouse.onDown (onMouseDown position)
+            , Mouse.onOver (onMouseHover position)
             ]
             []
         , Svg.text_
@@ -124,11 +138,14 @@ renderPiece style position value =
             , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.textAnchor "middle"
             , Svg.Attributes.alignmentBaseline "middle"
-            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth / 2))
+            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth * 2.5 * style.toPieceScale value))
+            , Svg.Attributes.fontWeight "bold"
+            , Svg.Attributes.fontFamily "Consolas, monospace"
             , Svg.Attributes.strokeWidth (String.fromFloat (style.gridLineWidth * 2.0))
-            , Svg.Attributes.fill (toCssString Color.black)
+            , Svg.Attributes.fill (toCssString (style.toPieceTextColor value))
             , Svg.Attributes.z "1000"
             , Mouse.onDown (onMouseDown position)
+            , Mouse.onOver (onMouseHover position)
             ]
             [ Svg.text (style.toText value) ]
         ]
@@ -147,16 +164,9 @@ renderCell style position value =
         , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
         , Svg.Attributes.fill (toCssString (style.toCellColor value))
         , Svg.Attributes.stroke (toCssString style.gridLineColor)
-        , Svg.Attributes.fillOpacity (style.toCellOpacity value |> String.fromFloat)
+        , Svg.Attributes.fillOpacity "1" --(style.toCellOpacity value |> String.fromFloat)
         , Mouse.onDown (onMouseDown position)
-        , Mouse.onOver
-            (\r ->
-                let
-                    ( x, y ) =
-                        r.clientPos
-                in
-                { cell = position, coordinates = { x = x, y = y }, interaction = Hover }
-            )
+        , Mouse.onOver (onMouseHover position)
         ]
         []
 

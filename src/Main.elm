@@ -15,8 +15,9 @@ import Game exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Settings exposing (..)
+import Task exposing (..)
 import Time exposing (..)
-import VariableSettings as Settings exposing (..)
 
 
 
@@ -70,6 +71,7 @@ type Msg
     | ClickedStartGame
     | ClickedRestart
     | Tick Posix
+    | StartGameNow Posix
 
 
 {-| Helper function to allow piping of a Cmd Msg into a tuple with a Model.
@@ -102,13 +104,12 @@ update msg screen =
 
                 -- When the user clicks Start Game, we initialize a new Game with the current settings.
                 ClickedStartGame ->
-                    Game.init settings
-                        |> mapGameCmd
+                    SettingsScreen settings
+                        |> withCmd (Task.perform StartGameNow Time.now)
 
-                Tick posix ->
-                    { settings | time = posixToMillis posix }
-                        |> SettingsScreen
-                        |> withCmd Cmd.none
+                StartGameNow posix ->
+                    Game.init { settings | time = posixToMillis posix }
+                        |> mapGameCmd
 
                 -- You shouldn't get any Gameplay messages from the Settings screen, but if you do, just return the current screen as-is.
                 _ ->
@@ -152,12 +153,15 @@ TODO: modify this function to include your own intro text.
 introText : Html Msg
 introText =
     div [ class "intro-text" ]
-        [ p [] [ text "Magnet Melee! Control as much space on the board as possible using your magnetic powers." ]
-        , p [] [ text "Rule 1: Magnets of similar polarities repel each other while magnets of opposing polarity attract each other" ]
-        , p [] [ text "Rule 2: Magnets exert magnetic fields in only 8 directions" ]
-        , p [] [ text "Rule 3: The more space you control via your magnetic field, the more points you get" ]
-        , p [] [ text "Rule 4: Knock opponents magnets off the field to secure victory!" ]
-        , p [] [ text " The game ends when you run out of moves" ]
+        [ h3 [] [ text "Magnet Melee! Control as much space on the board as possible using your magnetic powers." ]
+        , p []
+            [ strong [] [ text "Magnetism: " ]
+            , text "Strength of each magnet - the stronger the magnet, the more force they exert on other magnets."
+            ]
+        , p []
+            [ strong [] [ text "Friction: " ]
+            , text "Amount of friction on the field - this controls how much speed each magnet loses as it moves"
+            ]
         ]
 
 
@@ -201,11 +205,6 @@ view screen =
 --------------------------------------------------------------------------------
 
 
-subscriptions : Sub Msg
-subscriptions =
-    Time.every 100000 Tick
-
-
 {-| The actual main entrypoint to run the application.
 
 If your game isn't too complicated, you probably don't need to modify this at all.
@@ -222,5 +221,5 @@ main =
         { view = view
         , init = \_ -> init
         , update = update
-        , subscriptions = always subscriptions
+        , subscriptions = \_ -> Sub.none
         }
