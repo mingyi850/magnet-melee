@@ -3,9 +3,7 @@ module Main exposing (..)
 {-| This is the main entrypoint for your game in Elm.
 
 Essentially, this file does the routing to the Settings screen or the Gameplay
-screen. There are a few parts of this file you'll probably want to edit from a
-text perspective, but most of what you will need to edit from a logic
-perspective is actually in the `Settings.elm` and `Game.elm` files.
+screen.
 
 -}
 
@@ -111,24 +109,20 @@ update msg screen =
                     Game.init { settings | time = posixToMillis posix }
                         |> mapGameCmd
 
-                -- You shouldn't get any Gameplay messages from the Settings screen, but if you do, just return the current screen as-is.
                 _ ->
                     screen
                         |> withCmd Cmd.none
 
         GameplayScreen game ->
             case msg of
-                -- If we get a Gameplay message, we update the Gameplay screen as per the update function in Game.elm.
                 GameplayMsg gameMsg ->
                     Game.update gameMsg game
                         |> mapGameCmd
 
-                -- When the user clicks Restart, we go back to the Settings screen with the current settings.
                 ClickedRestart ->
                     SettingsScreen game.settings
                         |> withCmd Cmd.none
 
-                -- You shouldn't get any Settings messages from the Gameplay screen, but if you do, just return the current screen as-is.
                 _ ->
                     screen
                         |> withCmd Cmd.none
@@ -140,16 +134,6 @@ update msg screen =
 --------------------------------------------------------------------------------
 
 
-{-| This is the intro text (as HTML) that appears on the Settings screen.
-You can modify it to whatever you like, but if you put a lot of text here (e.g.
-if you want to put your full rules here), you will probably need to change the
-CSS styles for the Settings modal to make it bigger. Keep in mind that the
-user will have also been on the game description page, where you can write
-long instructions too.
-
-TODO: modify this function to include your own intro text.
-
--}
 introText : Html Msg
 introText =
     div [ class "intro-text" ]
@@ -165,17 +149,6 @@ introText =
         ]
 
 
-{-| The view function for the application. This function mostly just routes the view
-to whatever was defined in the Settings.elm view function and the Game.elm view function
-(with some wrappers around them).
-
-I've put the Game Title and Team Name in the Settings modal header, but you
-can delete these if you don't feel like you need them.
-
-TODO: modify this function to include your own title and team name, or delete the
-modal header.
-
--}
 view : Model -> Html Msg
 view screen =
     case screen of
@@ -206,14 +179,6 @@ view screen =
 
 
 {-| The actual main entrypoint to run the application.
-
-If your game isn't too complicated, you probably don't need to modify this at all.
-
-If your game uses advanced features of Elm (e.g. if you need to use Ports to
-communicate with JavaScript, or if you need to use subscriptions for events
-that trigger automatically), you will need to modify this to include those.
-You can ask me if you need any help with this.
-
 -}
 main : Program () Model Msg
 main =

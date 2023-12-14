@@ -1,15 +1,6 @@
 module SettingsComponents exposing (..)
 
-{-| This module handles everything on the Settings screen.
-
-TODO: You will need to modify this file to add / remove settings for your game.
-
-Adding/removing a setting is a 5-step process.
-(I know it seems like a lot, but it is necessary so Elm can make static
-guarantees at compile time about your Settings).
-
-I've outlined the five steps below under SETTING DEFINITIONS.
-
+{-| This module contains the reuable components used for the settings picker.
 -}
 
 import Array exposing (..)
@@ -21,11 +12,6 @@ import Random exposing (..)
 
 
 
--- =============================================================================
--- =============================================================================
--- NOTE: YOU PROBABLY DON'T HAVE TO MODIFY ANYTHING BELOW THIS LINE
--- =============================================================================
--- =============================================================================
 --------------------------------------------------------------------------------
 -- HELPER FUNCTIONS
 -- If your use cases are covered by the basic types of settings above, you don't have to
