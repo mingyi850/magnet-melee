@@ -153,9 +153,15 @@ TODO: modify this function to include your own intro text.
 introText : Html Msg
 introText =
     div [ class "intro-text" ]
-        [ p [] [ text "Magnet Melee! Control as much space on the board as possible using your magnetic powers." ]
-        , p [] [ text "1. Magnetism defines the strength of each magnet - the stronger the magnet, the faster the magnets move." ]
-        , p [] [ text "2. Friction defines the amount of friction on the field - this controls how 'slidey' the field is" ]
+        [ h3 [] [ text "Magnet Melee! Control as much space on the board as possible using your magnetic powers." ]
+        , p []
+            [ strong [] [ text "Magnetism: " ]
+            , text "Strength of each magnet - the stronger the magnet, the more force they exert on other magnets."
+            ]
+        , p []
+            [ strong [] [ text "Friction: " ]
+            , text "Amount of friction on the field - this controls how much speed each magnet loses as it moves"
+            ]
         ]
 
 

@@ -669,7 +669,7 @@ polarityPickChoiceConfig player game =
 
 viewPolaritySelector : Game -> PickChoiceButtonsConfig Msg -> Html Msg
 viewPolaritySelector game data =
-    viewPickerItem "polarity-selector" [ Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
+    viewPickerItem "polarity-selector" [ Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] (PickChoiceButtons data)
 
 
 getPlayerContainers : Game -> List (Html Msg)
@@ -707,7 +707,7 @@ getGameOverContainer game =
         div [ id "game-over", class "game-over-container" ]
             [ div [ id "game-over-headers", class "game-over-header-container" ]
                 [ h1 [ id "game-over-subheader" ] [ Html.text "Winner: " ]
-                , div [ id "player-numbers-row", class "player-number-row" ] [ playerNumContainer game (getGameWinner game) ]
+                , div [ id "player-numbers-row", class "player-number-row" ] [ playerNumContainer False game (getGameWinner game) ]
                 ]
             , div [ id "game-over-scores", class "game-over-scores-container" ]
                 [ h1 [ id "game-over-subheader" ] [ Html.text "Scores: " ]
@@ -719,8 +719,8 @@ getGameOverContainer game =
         div [] []
 
 
-playerNumContainer : Game -> Int -> Html Msg
-playerNumContainer game playerNum =
+playerNumContainer : Bool -> Game -> Int -> Html Msg
+playerNumContainer isHeader game playerNum =
     let
         playerAgent =
             case getPlayerAgency playerNum game of
@@ -732,10 +732,24 @@ playerNumContainer game playerNum =
 
                 AIHard ->
                     "(AI)"
+
+        size =
+            if isHeader then
+                px 30
+
+            else
+                px (55 - (10 * Dict.size game.players))
+
+        textSize =
+            if isHeader then
+                px 24
+
+            else
+                px (24 - (2 * Dict.size game.players))
     in
     div [ id "num-container", class "player-number-container" ]
-        [ div [ id "player-color", class "player-color-indicator" ]
-            [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width (px (60 - (10 * Dict.size game.players))), Svg.Attributes.height (px (60 - (10 * Dict.size game.players))) ]
+        [ div [ id "player-color", class "player-color-indicator", Svg.Attributes.width size ]
+            [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width size, Svg.Attributes.height size ]
                 [ Svg.circle
                     [ Svg.Attributes.cx "50%"
                     , Svg.Attributes.cy "50%"
@@ -747,7 +761,7 @@ playerNumContainer game playerNum =
                     []
                 ]
             ]
-        , h1 [ id "player-num", class "player-number", Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ]
+        , h1 [ id "player-num", class "player-number", Html.Attributes.style "font-size" textSize ]
             [ Html.text ("Player " ++ String.fromInt (playerNum + 1) ++ playerAgent) ]
         ]
 
@@ -755,7 +769,7 @@ playerNumContainer game playerNum =
 playerScoreContainer : Game -> Int -> Player -> Html Msg
 playerScoreContainer game playerNum player =
     div [ id "player-score", class "player-score-container" ]
-        [ playerNumContainer game playerNum
+        [ playerNumContainer False game playerNum
         , div [ class "player-score-container" ]
             [ h2 [ id "score-box" ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
         ]
@@ -773,11 +787,11 @@ getPlayersOrGameOverContainer game =
 playerContainer : Int -> Player -> Game -> Html Msg
 playerContainer playerNum player game =
     div [ id "player-info", class "player-container" ]
-        [ playerNumContainer game playerNum
-        , div [ class "player-moves-container", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
+        [ playerNumContainer False game playerNum
         , viewPolaritySelector game (polarityPickChoiceConfig playerNum game)
+        , div [ class "player-moves-container", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ div [ id "moves-num" ] [ Html.text ("Moves: " ++ String.fromInt player.remainingMoves) ] ]
         , div [ class "player-score-box" ]
-            [ div [ id "score-box", Html.Attributes.style "font-size" (px (30 - (3 * Dict.size game.players))) ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
+            [ div [ id "score-box", Html.Attributes.style "font-size" (px (24 - (2 * Dict.size game.players))) ] [ Html.text ("Score: " ++ Round.round 3 player.score) ] ]
         ]
 
 
@@ -785,24 +799,22 @@ getTurnDisplay : GameStatus -> Game -> Html Msg
 getTurnDisplay status game =
     case status of
         HumanMove ->
-            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game game.turn ]
+            div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer True game game.turn ]
 
         AI _ ->
-            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer game game.turn ]
+            div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer True game game.turn ]
 
         Processing ->
-            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Processing   " ] ]
+            div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Processing   " ] ]
 
         GameOver ->
-            div [ id "turn-display" ] [ h2 [ id "turn-text" ] [ Html.text "Game Over   " ] ]
+            div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Game Over   " ] ]
 
 
 view : Game -> Html Msg
 view game =
     div [ id "game-screen-container" ]
-        [ h1 [ id "game-header" ]
-            [ Html.text "Magnet Melee!!!" ]
-        , getTurnDisplay game.status game
+        [ getTurnDisplay game.status game
         , div [ id "game-board", class "grid-container" ]
             [ getBoardView game
             , div [ id "game-scores-over", class "game-score-over-container" ]

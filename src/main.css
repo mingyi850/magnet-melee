@@ -18,7 +18,12 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Segoe UI",
+    Arial,
+    Helvetica,
+    system-ui,
+    sans-serif;
+
   /*font-family: "Segoe UI", Arial, Helvetica, system-ui, sans-serif;*/
   overflow: hidden;
 }
@@ -298,8 +303,7 @@ button#restart-button:active {
 .game-score-over-container {
   position: relative;
   min-width: 300px;
-  flex-shrink: 2;
-  margin-top: 50px;
+  margin-top: 0px;
 }
 
 .player-number {
@@ -318,7 +322,6 @@ button#restart-button:active {
 
 
 .player-color-indicator {
-  width: 50px;
   border-radius: 0%;
   margin: 0px;
 }
@@ -368,6 +371,11 @@ button#restart-button:active {
   justify-content: center;
   margin-left: 0px;
   gap: 0px;
+  background-color: #999;
+  border-width: 3px;
+  border: 3px solid #666;
+  border-radius: 20px;
+  margin: 10px;
 }
 
 .player-score-container {
@@ -402,7 +410,7 @@ button#restart-button:active {
 }
 
 #turn-text {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: bold;
   margin-bottom: 0px;
   margin-top: 0px;
@@ -418,7 +426,11 @@ button#restart-button:active {
 
 #game-header {
   font-size: 3rem;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Segoe UI",
+    Arial,
+    Helvetica,
+    system-ui,
+    sans-serif;
 }
 
 #turn-display>div {

@@ -53,7 +53,7 @@ mergeHslas hslaList =
         softmaxStrengths =
             hslaList
                 |> List.map Tuple.second
-                |> sqAvg
+                |> meanSquare
                 |> List.map2 (\( hsla, _ ) softmaxStrength -> ( hsla, softmaxStrength )) hslaList
     in
     List.foldl (\( hsla, strength ) accum -> addHslaVectors (hslaToVector hsla strength) accum) zeroHslaVector softmaxStrengths

@@ -141,11 +141,11 @@ softmax list =
     List.map (\x -> x / sum) exps
 
 
-sqAvg : List Float -> List Float
-sqAvg list =
+meanSquare : List Float -> List Float
+meanSquare list =
     let
         exps =
-            List.map (\x -> x ^ 2) list
+            List.map (\x -> x ^ 1.5) list
 
         sum =
             List.sum exps

@@ -830,7 +830,12 @@ getBoardScores board =
     in
     Dict.foldl
         (\coordinate field existing ->
-            addDicts existing (getFieldScore field)
+            case getPieceFromCoordinate board (intCoordinateToFloat (intCoordinateFromTuple coordinate)) of
+                Just piece ->
+                    addDicts existing (Dict.fromList [ ( piece.player, 1.0 ) ])
+
+                Nothing ->
+                    addDicts existing (getFieldScore field)
         )
         playerDict
         board.magneticField
