@@ -46,6 +46,7 @@ type alias Game =
     , randomMove : RandomMove
     , friction : Float
     , padding : Int
+    , aiMoves : Int
     }
 
 
@@ -117,6 +118,7 @@ init settings =
             , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = Nothing }
             , friction = settings.friction
             , padding = settings.padding
+            , aiMoves = Basics.max 150 settings.gridSize * 2
             }
     in
     initialGame |> (\game -> withDetermineUpdateCommand game [] game)
@@ -402,7 +404,7 @@ determineUpdateCommand previousGame previousStates game =
             send 100.0 (GenerateAIMove 0)
 
         AI 1 ->
-            send 100.0 (GenerateAIMove (game.gridSize * 2))
+            send 100.0 (GenerateAIMove game.aiMoves)
 
         _ ->
             Cmd.none
@@ -487,7 +489,8 @@ update msg game =
                             update PlayAIMove { game | randomMove = newMove }
 
                         Nothing ->
-                            update (GenerateAIMove 0) { game | randomMove = newMove }
+                            { game | randomMove = newMove }
+                                |> withCmd (sendNow (GenerateAIMove 0))
 
                 AI 1 ->
                     if num == 0 then
@@ -719,6 +722,11 @@ getGameOverContainer game =
         div [] []
 
 
+getClockLoader : Game -> Html Msg
+getClockLoader game =
+    span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_40" ]
+
+
 playerNumContainer : Bool -> Game -> Int -> Html Msg
 playerNumContainer isHeader game playerNum =
     let
@@ -802,7 +810,7 @@ getTurnDisplay status game =
             div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer True game game.turn ]
 
         AI _ ->
-            div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer True game game.turn ]
+            div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Turn:    " ], playerNumContainer True game game.turn, Html.text "Thinking", getClockLoader game ]
 
         Processing ->
             div [ id "turn-display" ] [ h3 [ id "turn-text" ] [ Html.text "Processing   " ] ]
