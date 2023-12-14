@@ -1,4 +1,4 @@
-module VectorUtils exposing (..)
+module Utils.VectorUtils exposing (..)
 
 
 type alias FloatVector =

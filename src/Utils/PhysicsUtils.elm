@@ -1,7 +1,7 @@
-module PhysicsUtils exposing (..)
+module Utils.PhysicsUtils exposing (..)
 
-import Utils exposing (..)
-import VectorUtils exposing (..)
+import Utils.Utils exposing (..)
+import Utils.VectorUtils exposing (..)
 
 
 type alias PVector =

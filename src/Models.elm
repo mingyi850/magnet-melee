@@ -9,10 +9,11 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import MyCellGrid exposing (..)
-import PhysicsUtils exposing (..)
 import Set exposing (..)
-import Utils exposing (..)
-import VectorUtils exposing (..)
+import Utils.ColorUtils exposing (..)
+import Utils.PhysicsUtils exposing (..)
+import Utils.Utils exposing (..)
+import Utils.VectorUtils exposing (..)
 
 
 

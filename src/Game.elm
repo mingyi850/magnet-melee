@@ -32,7 +32,8 @@ import SettingsComponents exposing (..)
 import Svg exposing (..)
 import Svg.Attributes
 import Task
-import Utils exposing (..)
+import Utils.ColorUtils exposing (..)
+import Utils.Utils exposing (..)
 
 
 
@@ -619,7 +620,7 @@ getBoardView game =
 
 polarityPickChoiceConfig2 : Int -> Game -> PickChoiceButtonsConfig Msg
 polarityPickChoiceConfig2 player game =
-    { label = "Player Polarity"
+    { label = "Polarity"
     , options =
         [ { label = "+", onSelect = UpdatePlayerPolarity player Positive, isSelected = getPlayerPolarity player game == Positive }
         , { label = "-", onSelect = UpdatePlayerPolarity player Negative, isSelected = getPlayerPolarity player game == Negative }
@@ -681,6 +682,18 @@ getGameOverContainer game =
 
 playerNumContainer : Game -> Int -> Html Msg
 playerNumContainer game playerNum =
+    let
+        playerAgent =
+            case getPlayerAgency playerNum game of
+                Human ->
+                    ""
+
+                AIEasy ->
+                    "(AI)"
+
+                AIHard ->
+                    "(AI)"
+    in
     div [ id "num-container", class "player-number-container" ]
         [ div [ id "player-color", class "player-color-indicator" ]
             [ Svg.svg [ Svg.Attributes.viewBox "0 0 100 100", Svg.Attributes.width (px (60 - (10 * Dict.size game.players))), Svg.Attributes.height (px (60 - (10 * Dict.size game.players))) ]
@@ -696,7 +709,7 @@ playerNumContainer game playerNum =
                 ]
             ]
         , h1 [ id "player-num", class "player-number", Html.Attributes.style "font-size" (px (30 - (2 * Dict.size game.players))) ]
-            [ Html.text ("Player " ++ String.fromInt (playerNum + 1)) ]
+            [ Html.text ("Player " ++ String.fromInt (playerNum + 1) ++ playerAgent) ]
         ]
 
 
