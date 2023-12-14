@@ -1,17 +1,6 @@
 module Game exposing (..)
 
 {-| This file handles all the game logic and provides the Gameplay interface to the Main application.alias.
-
-The core parts you need to implement are:
-
-1.  A type for your Game model
-2.  An initialisation function that takes a Settings record and returns a Game record
-3.  A Msg type that represents all the possible messages that can be sent from the interface to the game logic
-4.  An update function that takes a Msg and a Game and returns a new Game
-5.  A view function that takes a Game and returns Html Msg (the interface for the game)
-
-You'll probably want to implement a lot of helper functions to make the above easier.
-
 -}
 
 import Array exposing (..)
@@ -43,18 +32,6 @@ import Utils.Utils exposing (..)
 
 
 {-| A record type which contains all of the game state.
-
-This needs to be sufficiently detailed to represent the entire game state, i.e.
-if you save this record, turn off your computer, and then reload this record,
-you should be able to pick up the game exactly where you left off.
-
-We also need some metadata including the settings used to initialise
-the game, the status (whether it's still going or completed), and
-whose turn it currently is.
-
-You might also like to pre-calculate some data and store it here
-if you will use it a lot.
-
 -}
 type alias Game =
     { settings : Settings
@@ -145,6 +122,8 @@ init settings =
     initialGame |> (\game -> withDetermineUpdateCommand game [] game)
 
 
+{-| Checks which players turn it is to start the game.
+-}
 getInitGameStatus : Settings -> GameStatus
 getInitGameStatus settings =
     let
@@ -176,11 +155,15 @@ type Move
     | DisplayPiece IntCoordinate Polarity
 
 
+{-| Status of a given move
+-}
 type Status
     = Success
     | Failure
 
 
+{-| Model for a move users can make
+-}
 type alias MoveData =
     { x : Int
     , y : Int
@@ -219,128 +202,10 @@ applyMove move game =
                 { status = Failure, game = { game | board = removeTentativePieces game.board |> updateBoardMagneticField game.magnetism } }
 
 
-generateRandomMove : Game -> RandomMove
-generateRandomMove game =
-    let
-        randomCoordinate =
-            Random.step (Random.pair (Random.int 0 (game.board.config.gridDimensions - 1)) (Random.int 0 (game.board.config.gridDimensions - 1))) game.randomMove.seed
-                |> (\( ( x, y ), seed ) -> { x = x, y = y, seed = seed })
 
-        randomPolarity =
-            if Tuple.first (Random.step (Random.int 0 1) randomCoordinate.seed) == 0 then
-                Negative
-
-            else
-                Positive
-
-        move =
-            { x = randomCoordinate.x, y = randomCoordinate.y, polarity = randomPolarity }
-    in
-    { move = move, seed = randomCoordinate.seed, score = getMoveScore game.turn move game }
-
-
-getGameScore : Game -> Dict Int Float
-getGameScore game =
-    let
-        scores =
-            Dict.fromList (range 0 (Dict.size game.players - 1) |> List.map (\player -> ( player, 0.0 )))
-
-        boardScores =
-            getBoardScores game.board
-    in
-    addDicts scores boardScores
-
-
-getAvgScoreMargin : Int -> Game -> Float
-getAvgScoreMargin player game =
-    let
-        scores =
-            getGameScore game
-
-        playerScore =
-            Dict.get player scores |> Maybe.withDefault 0.0
-    in
-    Dict.values scores |> List.map (\otherScore -> playerScore - otherScore) |> List.foldl (+) 0.0 |> (\x -> x / toFloat (Dict.size scores - 1))
-
-
-getPlayerPolarity : Int -> Game -> Polarity
-getPlayerPolarity player game =
-    Maybe.withDefault Negative (Maybe.map (\playerData -> playerData.polarity) (Dict.get player game.players))
-
-
-getPlayerAgency : Int -> Game -> Agent
-getPlayerAgency player game =
-    Maybe.withDefault Human (Maybe.map (\playerData -> playerData.agent) (Dict.get player game.players))
-
-
-
---------------------------------------------------------------------------------
--- INTERFACE LOGIC
---
--- This section deals with how to map the interface to the game logic.
---
--- Msg contains messages that can be sent from the game interface. You should then
--- choose how to handle them in terms of game logic.
---
--- This also sets scaffolding for the computer players - when a computer player
--- makes a move, they generate a message (ReceivedComputerMove) which is then handled
--- just like a player interacting with the interface.
---------------------------------------------------------------------------------
-
-
-{-| An enumeration of all messages that can be sent from the interface to the game
--}
-type Msg
-    = ModelMsg Models.Msg
-    | GenerateAIMove Int
-    | PlayAIMove
-    | UpdateBoard (List Board)
-    | UpdatePlayerPolarity Int Polarity
-
-
-{-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
--}
-withCmd : Cmd Msg -> Game -> ( Game, Cmd Msg )
-withCmd cmd game =
-    ( game, cmd )
-
-
-{-| Get Cell Coordinates from CellGrid Click
--}
-determineCellCoordinates : Game -> MyCellGrid.Msg -> Maybe IntCoordinate
-determineCellCoordinates game cellMsg =
-    let
-        boardCoordinate =
-            mapViewCoordinateToBoard game.padding game.gridSize { x = cellMsg.cell.column, y = cellMsg.cell.row }
-    in
-    boardCoordinate
-
-
-{-| Progress game state after a successful move
--}
-progressGameSuccess : Int -> Game -> ( Game, Cmd Msg )
-progressGameSuccess player game =
-    { game
-        | players =
-            Dict.update player (Maybe.map (\playerData -> { playerData | remainingMoves = playerData.remainingMoves - 1 })) game.players
-        , totalMoves = game.totalMoves + 1
-        , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
-        , status = Processing
-        , randomMove = { move = game.randomMove.move, seed = game.randomMove.seed, score = Nothing }
-    }
-        |> withCmd (send 200.0 (UpdateBoard []))
-
-
-{-| Utility Function to used to decide next action based on game state
--}
-processMoveResult : Int -> (Int -> Game -> ( Game, Cmd Msg )) -> (Int -> Game -> ( Game, Cmd Msg )) -> GameMoveResult -> ( Game, Cmd Msg )
-processMoveResult player onSuccess onFailure moveResult =
-    case moveResult.status of
-        Success ->
-            onSuccess player moveResult.game
-
-        Failure ->
-            onFailure player moveResult.game
+{-------------------------------------------
+    Update methods
+-------------------------------------------}
 
 
 {-| Calls board API to get board score
@@ -382,15 +247,48 @@ updateGameBoard game =
         newGame
 
 
-{-| Simulates the game board for a given number of steps
+{-| Updates the polarity of a player from the game screen
 -}
-simulateGameBoard : Int -> Game -> Game -> Game
-simulateGameBoard steps prevGame currentGame =
-    if steps <= 0 || prevGame == currentGame then
-        currentGame
+updatePlayerPolarity : Int -> Polarity -> Game -> Game
+updatePlayerPolarity player polarity game =
+    { game
+        | players =
+            Dict.update player (Maybe.map (\playerData -> { playerData | polarity = polarity })) game.players
+    }
 
-    else
-        simulateGameBoard (steps - 1) currentGame (updateGameBoard currentGame)
+
+
+{-------------------------------------------
+    Getter methods to query game state 
+-------------------------------------------}
+
+
+{-| Gets the current game score
+-}
+getGameScore : Game -> Dict Int Float
+getGameScore game =
+    let
+        scores =
+            Dict.fromList (range 0 (Dict.size game.players - 1) |> List.map (\player -> ( player, 0.0 )))
+
+        boardScores =
+            getBoardScores game.board
+    in
+    addDicts scores boardScores
+
+
+{-| Gets a given player's polarity
+-}
+getPlayerPolarity : Int -> Game -> Polarity
+getPlayerPolarity player game =
+    Maybe.withDefault Negative (Maybe.map (\playerData -> playerData.polarity) (Dict.get player game.players))
+
+
+{-| Gets a given player's agency (AI or Human)
+-}
+getPlayerAgency : Int -> Game -> Agent
+getPlayerAgency player game =
+    Maybe.withDefault Human (Maybe.map (\playerData -> playerData.agent) (Dict.get player game.players))
 
 
 {-| Get current game status
@@ -412,16 +310,6 @@ getGameStatus game =
                 AI 1
 
 
-{-| Updates the polarity of a player from the game screen
--}
-updatePlayerPolarity : Int -> Polarity -> Game -> Game
-updatePlayerPolarity player polarity game =
-    { game
-        | players =
-            Dict.update player (Maybe.map (\playerData -> { playerData | polarity = polarity })) game.players
-    }
-
-
 {-| Checks game over condition
 -}
 checkGameOver : Game -> Bool
@@ -431,6 +319,38 @@ checkGameOver game =
 
     else
         False
+
+
+
+--------------------------------------------------------------------------------
+-- INTERFACE LOGIC
+--
+-- This section deals with how to map the interface to the game logic.
+--
+-- Msg contains messages that can be sent from the game interface. You should then
+-- choose how to handle them in terms of game logic.
+--
+-- This also sets scaffolding for the computer players - when a computer player
+-- makes a move, they generate a message (ReceivedComputerMove) which is then handled
+-- just like a player interacting with the interface.
+--------------------------------------------------------------------------------
+
+
+{-| An enumeration of all messages that can be sent from the interface to the game
+-}
+type Msg
+    = ModelMsg Models.Msg
+    | GenerateAIMove Int
+    | PlayAIMove
+    | UpdateBoard (List Board)
+    | UpdatePlayerPolarity Int Polarity
+
+
+{-| A convenience function to pipe a command into a (Game, Cmd Msg) tuple.
+-}
+withCmd : Cmd Msg -> Game -> ( Game, Cmd Msg )
+withCmd cmd game =
+    ( game, cmd )
 
 
 {-| Sends a message to the Elm runtime with some delay
@@ -447,6 +367,68 @@ sendNow : msg -> Cmd msg
 sendNow msg =
     Task.succeed msg
         |> Task.perform identity
+
+
+{-| Sends a message to the Elm runtime to fetch a move from the AI
+-}
+sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
+sendGetAIMove player game =
+    ( game, send 200.0 (GenerateAIMove 1) )
+
+
+{-| Utility function to always send a specific message regardless of game move status
+-}
+alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
+alwaysCommand msg { game, status } =
+    ( game, msg )
+
+
+{-| Attaches update command to game based on game state
+-}
+withDetermineUpdateCommand : Game -> List Board -> Game -> ( Game, Cmd Msg )
+withDetermineUpdateCommand prevGame previousStates game =
+    withCmd (determineUpdateCommand prevGame previousStates game) game
+
+
+{-| Determines update c ommand based on game state
+-}
+determineUpdateCommand : Game -> List Board -> Game -> Cmd Msg
+determineUpdateCommand previousGame previousStates game =
+    case game.status of
+        Processing ->
+            send 50.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
+
+        AI 0 ->
+            send 100.0 (GenerateAIMove 0)
+
+        AI 1 ->
+            send 100.0 (GenerateAIMove (game.gridSize * 2))
+
+        _ ->
+            Cmd.none
+
+
+{-| Get Cell Coordinates from CellGrid Click
+-}
+determineCellCoordinates : Game -> MyCellGrid.Msg -> Maybe IntCoordinate
+determineCellCoordinates game cellMsg =
+    let
+        boardCoordinate =
+            mapViewCoordinateToBoard game.padding game.gridSize { x = cellMsg.cell.column, y = cellMsg.cell.row }
+    in
+    boardCoordinate
+
+
+{-| Utility Function to used to decide next action based on game state
+-}
+processMoveResult : Int -> (Int -> Game -> ( Game, Cmd Msg )) -> (Int -> Game -> ( Game, Cmd Msg )) -> GameMoveResult -> ( Game, Cmd Msg )
+processMoveResult player onSuccess onFailure moveResult =
+    case moveResult.status of
+        Success ->
+            onSuccess player moveResult.game
+
+        Failure ->
+            onFailure player moveResult.game
 
 
 {-| The main update function for the game, which takes an interface message and returns
@@ -553,18 +535,36 @@ update msg game =
                     ( game, Cmd.none )
 
 
-{-| Sends a message to the Elm runtime to fetch a move from the AI
+{-| Progress game state after a successful move
 -}
-sendGetAIMove : Int -> Game -> ( Game, Cmd Msg )
-sendGetAIMove player game =
-    ( game, send 200.0 (GenerateAIMove 1) )
+progressGameSuccess : Int -> Game -> ( Game, Cmd Msg )
+progressGameSuccess player game =
+    { game
+        | players =
+            Dict.update player (Maybe.map (\playerData -> { playerData | remainingMoves = playerData.remainingMoves - 1 })) game.players
+        , totalMoves = game.totalMoves + 1
+        , turn = modBy (Dict.size game.players) (game.totalMoves + 1)
+        , status = Processing
+        , randomMove = { move = game.randomMove.move, seed = game.randomMove.seed, score = Nothing }
+    }
+        |> withCmd (send 200.0 (UpdateBoard []))
 
 
-{-| Utility function to always send a specific message regardless of game move status
+
+{------------------------------------------------------------------------------
+    AI Helper Functions
+------------------------------------------------------------------------------}
+
+
+{-| Simulates the game board for a given number of steps
 -}
-alwaysCommand : Cmd Msg -> GameMoveResult -> ( Game, Cmd Msg )
-alwaysCommand msg { game, status } =
-    ( game, msg )
+simulateGameBoard : Int -> Game -> Game -> Game
+simulateGameBoard steps prevGame currentGame =
+    if steps <= 0 || prevGame == currentGame then
+        currentGame
+
+    else
+        simulateGameBoard (steps - 1) currentGame (updateGameBoard currentGame)
 
 
 {-| Utility function to evaluate an AI's move
@@ -585,29 +585,38 @@ getMoveScore player move game =
         Nothing
 
 
-{-| Attaches update command to game based on game state
+{-| Gets the average difference in score between a player and other players
 -}
-withDetermineUpdateCommand : Game -> List Board -> Game -> ( Game, Cmd Msg )
-withDetermineUpdateCommand prevGame previousStates game =
-    withCmd (determineUpdateCommand prevGame previousStates game) game
+getAvgScoreMargin : Int -> Game -> Float
+getAvgScoreMargin player game =
+    let
+        scores =
+            getGameScore game
+
+        playerScore =
+            Dict.get player scores |> Maybe.withDefault 0.0
+    in
+    Dict.values scores |> List.map (\otherScore -> playerScore - otherScore) |> List.foldl (+) 0.0 |> (\x -> x / toFloat (Dict.size scores - 1))
 
 
-{-| Determines update c ommand based on game state
--}
-determineUpdateCommand : Game -> List Board -> Game -> Cmd Msg
-determineUpdateCommand previousGame previousStates game =
-    case game.status of
-        Processing ->
-            send 50.0 (UpdateBoard (List.append previousStates [ previousGame.board ]))
+generateRandomMove : Game -> RandomMove
+generateRandomMove game =
+    let
+        randomCoordinate =
+            Random.step (Random.pair (Random.int 0 (game.board.config.gridDimensions - 1)) (Random.int 0 (game.board.config.gridDimensions - 1))) game.randomMove.seed
+                |> (\( ( x, y ), seed ) -> { x = x, y = y, seed = seed })
 
-        AI 0 ->
-            send 100.0 (GenerateAIMove 0)
+        randomPolarity =
+            if Tuple.first (Random.step (Random.int 0 1) randomCoordinate.seed) == 0 then
+                Negative
 
-        AI 1 ->
-            send 100.0 (GenerateAIMove (game.gridSize * 2))
+            else
+                Positive
 
-        _ ->
-            Cmd.none
+        move =
+            { x = randomCoordinate.x, y = randomCoordinate.y, polarity = randomPolarity }
+    in
+    { move = move, seed = randomCoordinate.seed, score = getMoveScore game.turn move game }
 
 
 

@@ -126,7 +126,7 @@ renderPiece style position value =
             , Svg.Attributes.r (String.fromFloat (style.cellWidth * style.toPieceScale value))
             , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
             , Svg.Attributes.fill (toCssString (style.toPieceColor value))
-            , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value)) --(toCssString style.gridLineColor)
+            , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
             , Svg.Attributes.fillOpacity "1"
             , Svg.Attributes.z "500"
             , Mouse.onDown (onMouseDown position)

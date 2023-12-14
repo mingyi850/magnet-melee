@@ -165,20 +165,6 @@ hslaToColor hsla =
     fromHsla hsla
 
 
-colorFromTuple : ( Float, Float, Float ) -> Color.Color
-colorFromTuple ( r, g, b ) =
-    Color.rgb r g b
-
-
-blendRGB : List ( Float, Float, Float ) -> ( Float, Float, Float )
-blendRGB colors =
-    let
-        ( tr, tg, tb ) =
-            List.foldl (\( r, g, b ) ( r2, g2, b2 ) -> ( r + r2, g + g2, b + b2 )) ( 0, 0, 0 ) colors
-    in
-    ( tr / toFloat (List.length colors), tg / toFloat (List.length colors), tb / toFloat (List.length colors) )
-
-
 emptyMagneticField : MagneticField
 emptyMagneticField =
     { positiveVector = { x = 0, y = 0 }
@@ -212,32 +198,6 @@ type Polarity
     | None
 
 
-toPolarityString : Polarity -> String
-toPolarityString polarity =
-    case polarity of
-        Positive ->
-            "Positive"
-
-        Negative ->
-            "Negative"
-
-        None ->
-            ""
-
-
-fromPolarityString : String -> Polarity
-fromPolarityString polarity =
-    case polarity of
-        "Positive" ->
-            Positive
-
-        "Negative" ->
-            Negative
-
-        _ ->
-            None
-
-
 toPolarityIcon : Polarity -> String
 toPolarityIcon polarity =
     case polarity of
@@ -267,6 +227,8 @@ emptyBoard boardConfig =
     }
 
 
+{-| Gets a piece from a given coordinate if it exists
+-}
 getPieceFromCoordinate : Board -> BoardCoordinate -> Maybe Piece
 getPieceFromCoordinate board coordinate =
     let
@@ -277,6 +239,27 @@ getPieceFromCoordinate board coordinate =
     Maybe.andThen (\index -> Dict.get index board.pieces) pieceIndex
 
 
+{-| Gets a tentative piece from a given coordinate if it exists
+-}
+getTentativePieceFromCoordinate : Board -> BoardCoordinate -> Maybe Piece
+getTentativePieceFromCoordinate board coordinate =
+    let
+        pieceIndex =
+            board.tentativeCoordinatePieces
+                |> Dict.get (coordinateToTuple coordinate)
+    in
+    Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
+
+
+{-| Gets a dead piece from a given coordinate if it exists
+-}
+getDeadPieceFromCoordinate : Board -> IntCoordinate -> Maybe Piece
+getDeadPieceFromCoordinate board coordinate =
+    Dict.get (intCoordinateToTuple coordinate) board.deadPieces
+
+
+{-| Checks if a given coordinate can be occupied by a piece
+-}
 checkValidPiecePlacement : BoardCoordinate -> Maybe BoardCoordinate -> Board -> Bool
 checkValidPiecePlacement coordinate toOmit board =
     let
@@ -296,35 +279,22 @@ checkValidPiecePlacement coordinate toOmit board =
         |> List.isEmpty
 
 
-getTentativePieceFromCoordinate : Board -> BoardCoordinate -> Maybe Piece
-getTentativePieceFromCoordinate board coordinate =
-    let
-        pieceIndex =
-            board.tentativeCoordinatePieces
-                |> Dict.get (coordinateToTuple coordinate)
-    in
-    Maybe.andThen (\index -> Dict.get index board.tentativePieces) pieceIndex
-
-
-getDeadPieceFromCoordinate : Board -> IntCoordinate -> Maybe Piece
-getDeadPieceFromCoordinate board coordinate =
-    Dict.get (intCoordinateToTuple coordinate) board.deadPieces
-
-
+{-| Utility function to check if a coordinate exists on the board
+-}
 coordinateOnBoard : BoardCoordinate -> Board -> Bool
 coordinateOnBoard coordinate board =
     coordinate.x >= 0 && coordinate.x < toFloat board.config.gridDimensions && coordinate.y >= 0 && coordinate.y < toFloat board.config.gridDimensions
 
 
-updateForceDict : Dict Int FloatVector -> Dict Int FloatVector -> Dict Int FloatVector
-updateForceDict forceDict newForceDict =
+{-| Adds 2 dictionaries of vectors together
+-}
+addForceDicts : Dict Int FloatVector -> Dict Int FloatVector -> Dict Int FloatVector
+addForceDicts forceDict newForceDict =
     Dict.foldl (\player force accumDict -> Dict.insert player (combineMaybeVectors force (Dict.get player accumDict)) accumDict) forceDict newForceDict
 
 
-
-{- Gets a mapping of pieceIndex, coordinate, and piece -}
-
-
+{-| Gets a mapping of pieceIndex, coordinate, and piece
+-}
 getCoordinatePieces : Board -> List ( Int, BoardCoordinate, Piece )
 getCoordinatePieces board =
     let
@@ -337,12 +307,7 @@ getCoordinatePieces board =
     Dict.toList allCoordinatePieces
         |> List.filterMap
             (\( coordinate, pieceIndex ) ->
-                case Dict.get pieceIndex allPieces of
-                    Just piece ->
-                        Just ( pieceIndex, coordinateFromTuple coordinate, piece )
-
-                    Nothing ->
-                        Nothing
+                Maybe.map (\piece -> ( pieceIndex, coordinateFromTuple coordinate, piece )) (Dict.get pieceIndex allPieces)
             )
 
 
@@ -457,7 +422,7 @@ updatePieceVelocities friction magnetism board =
             getMagneticForceOnAllPieces magnetism board
 
         newVelocities =
-            updateForceDict board.pieceVelocities magneticForceDict
+            addForceDicts board.pieceVelocities magneticForceDict
 
         newVelocitiesWithFriction =
             Dict.map
@@ -494,7 +459,7 @@ getMagneticForceOnAllPieces magnetism board =
                 resultantDict =
                     Dict.fromList [ ( i1, force ), ( i2, negative force ) ]
             in
-            updateForceDict accumDict resultantDict
+            addForceDicts accumDict resultantDict
         )
         Dict.empty
         coordinatePairs
@@ -524,7 +489,7 @@ updatePieceCollisions board =
             getCollidingPieceUpdates board board.pieceVelocities
 
         newPieceVelocities =
-            updateForceDict board.pieceVelocities updates
+            addForceDicts board.pieceVelocities updates
     in
     { board
         | pieceVelocities = newPieceVelocities
@@ -553,6 +518,8 @@ zeroPieceVelocities board =
     }
 
 
+{-| Gets deceleration of colliding pieces
+-}
 getCollidingPieceUpdates : Board -> Dict Int FloatVector -> Dict Int FloatVector
 getCollidingPieceUpdates board velocities =
     let
@@ -568,7 +535,7 @@ getCollidingPieceUpdates board velocities =
                                 ( antiV1, antiV2 ) =
                                     calculateCollisionVector ( c1, v1 ) ( c2, v2 )
                             in
-                            updateForceDict (Dict.fromList [ ( i1, antiV1 ), ( i2, antiV2 ) ]) accumDict
+                            addForceDicts (Dict.fromList [ ( i1, antiV1 ), ( i2, antiV2 ) ]) accumDict
 
                         _ ->
                             accumDict
@@ -735,6 +702,8 @@ movePiece board pieceIndex vector =
             board
 
 
+{-| Maps a dead piece's coordinate to a border square
+-}
 getNearestViewCoordinateToDeadPiece : Board -> BoardCoordinate -> IntCoordinate
 getNearestViewCoordinateToDeadPiece board coordinate =
     let
