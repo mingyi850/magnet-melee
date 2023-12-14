@@ -4,6 +4,7 @@ module Game exposing (..)
 -}
 
 import Array exposing (..)
+import BoardCellGrid exposing (InteractionType(..), Msg)
 import CellGrid exposing (..)
 import Common exposing (..)
 import Dict exposing (..)
@@ -12,7 +13,6 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import List exposing (..)
 import Models exposing (..)
-import MyCellGrid exposing (InteractionType(..), Msg)
 import Process
 import Random exposing (..)
 import Round exposing (..)
@@ -410,7 +410,7 @@ determineUpdateCommand previousGame previousStates game =
 
 {-| Get Cell Coordinates from CellGrid Click
 -}
-determineCellCoordinates : Game -> MyCellGrid.Msg -> Maybe IntCoordinate
+determineCellCoordinates : Game -> BoardCellGrid.Msg -> Maybe IntCoordinate
 determineCellCoordinates game cellMsg =
     let
         boardCoordinate =

@@ -1,4 +1,4 @@
-module MyCellGrid exposing (..)
+module BoardCellGrid exposing (..)
 
 {-| Render a cell grid as html using SVG
 
