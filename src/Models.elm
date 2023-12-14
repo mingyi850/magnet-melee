@@ -1,5 +1,6 @@
 module Models exposing (..)
 
+import BoardCellGrid exposing (..)
 import CellGrid exposing (..)
 import Color exposing (..)
 import Common exposing (Player)
@@ -8,7 +9,6 @@ import Dict exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import MyCellGrid exposing (..)
 import Set exposing (..)
 import Utils.ColorUtils exposing (..)
 import Utils.PhysicsUtils exposing (..)
@@ -23,7 +23,7 @@ import Utils.VectorUtils exposing (..)
 
 
 type Msg
-    = CellGridMessage MyCellGrid.Msg
+    = CellGridMessage BoardCellGrid.Msg
 
 
 type PlayerColor
@@ -993,7 +993,7 @@ getCellGrid padding board =
 
 boardHtml : Int -> Int -> Board -> Html Msg
 boardHtml padding magnetism board =
-    Html.map CellGridMessage (MyCellGrid.asHtml { width = board.config.displaySize, height = board.config.displaySize } (cellStyle padding magnetism board) (getCellGrid padding board))
+    Html.map CellGridMessage (BoardCellGrid.asHtml { width = board.config.displaySize, height = board.config.displaySize } (cellStyle padding magnetism board) (getCellGrid padding board))
 
 
 getCellColorFromContent : Int -> Int -> CellContent -> Color.Color
@@ -1181,7 +1181,7 @@ mapBoardCoordinateToView padding coordinate =
     { x = coordinate.x + padding, y = coordinate.y + padding }
 
 
-cellStyle : Int -> Int -> Board -> MyCellGrid.CellStyle CellContent
+cellStyle : Int -> Int -> Board -> BoardCellGrid.CellStyle CellContent
 cellStyle padding magnetism board =
     { toCellColor = \z -> getCellColorFromContent (Dict.size board.pieces + Dict.size board.tentativePieces) magnetism z
     , toPieceColor = \z -> getPieceColorFromContent z
