@@ -512,16 +512,19 @@ update msg game =
                                 case game.randomMove.score of
                                     Just score ->
                                         if newMoveScore > score then
-                                            update (GenerateAIMove (num - 1)) { game | randomMove = newMove }
+                                            { game | randomMove = newMove, aiProgress = game.aiMoves - num }
+                                                |> withCmd (send 0.0 (GenerateAIMove (num - 1)))
 
                                         else
-                                            update (GenerateAIMove (num - 1)) { game | randomMove = { move = game.randomMove.move, score = game.randomMove.score, seed = newMove.seed } }
+                                            { game | randomMove = { move = game.randomMove.move, score = game.randomMove.score, seed = newMove.seed }, aiProgress = game.aiMoves - num }
+                                                |> withCmd (send 0.0 (GenerateAIMove (num - 1)))
 
                                     Nothing ->
-                                        update (GenerateAIMove (num - 1)) { game | randomMove = newMove }
+                                        { game | randomMove = newMove, aiProgress = game.aiMoves - num }
+                                            |> withCmd (send 0.0 (GenerateAIMove (num - 1)))
 
                             Nothing ->
-                                update (GenerateAIMove num) { game | randomMove = newMove }
+                                update (GenerateAIMove num) { game | randomMove = newMove, aiProgress = game.aiMoves - num }
 
                 _ ->
                     ( game, Cmd.none )
@@ -726,7 +729,27 @@ getGameOverContainer game =
 
 getClockLoader : Game -> Html Msg
 getClockLoader game =
-    span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_40" ]
+    let
+        progress =
+            game.aiProgress * 100 // game.aiMoves
+    in
+    if progress < 25 then
+        span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_10" ]
+
+    else if progress < 33 then
+        span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_20" ]
+
+    else if progress < 66 then
+        span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_40" ]
+
+    else if progress < 75 then
+        span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_60" ]
+
+    else if progress < 90 then
+        span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_80" ]
+
+    else
+        span [ id "clock-loader", class "material-symbols-outlined" ] [ Html.text "clock_loader_90" ]
 
 
 playerNumContainer : Bool -> Game -> Int -> Html Msg
@@ -840,4 +863,5 @@ view game =
                 [ getPlayersOrGameOverContainer game
                 ]
             ]
+        , span [ id "clock-loader", class "material-symbols-outlined", Html.Attributes.style "font-size" "0px" ] [ Html.text "clock_loader_10" ]
         ]
