@@ -202,7 +202,8 @@ renderPiece : CellStyle a -> Position -> a -> List (Svg Msg)
 renderPiece style position value =
     if style.shouldRenderPiece value then
         Svg.circle
-            [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
+            [ Svg.Attributes.class "piece"
+            , Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.r (String.fromFloat (style.cellWidth * style.toPieceScale value))
             , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
