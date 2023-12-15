@@ -145,6 +145,9 @@ renderPlus style position value =
             )
         , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
         , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        , Svg.Attributes.z "600"
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver (onMouseHover position)
         ]
         []
     , Svg.polyline
@@ -157,6 +160,9 @@ renderPlus style position value =
             )
         , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
         , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        , Svg.Attributes.z "600"
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver (onMouseHover position)
         ]
         []
     ]
@@ -184,6 +190,9 @@ renderMinus style position value =
             )
         , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
         , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        , Svg.Attributes.z "600"
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver (onMouseHover position)
         ]
         []
     ]

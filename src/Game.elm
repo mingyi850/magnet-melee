@@ -119,7 +119,7 @@ init settings =
             , randomMove = { move = { x = settings.gridSize // 2, y = settings.gridSize // 2, polarity = Negative }, seed = initialSeed settings.time, score = Nothing }
             , friction = settings.friction
             , padding = settings.padding
-            , aiMoves = Basics.max 150 settings.gridSize * 2
+            , aiMoves = Basics.min 100 settings.gridSize * 2
             , aiProgress = 0
             }
     in
@@ -568,7 +568,7 @@ progressGameSuccess player game =
 -}
 simulateGameBoard : Int -> Game -> Game -> Game
 simulateGameBoard steps prevGame currentGame =
-    if steps <= 0 || prevGame.board.coordinatePieces == currentGame.board.coordinatePieces then
+    if steps <= 0 || (prevGame.board.pieceCoordinates == currentGame.board.pieceCoordinates) then
         currentGame
 
     else
