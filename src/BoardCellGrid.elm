@@ -117,10 +117,82 @@ onMouseHover position =
         { cell = position, coordinates = { x = x, y = y }, interaction = Hover }
 
 
+renderPlus : CellStyle a -> Position -> a -> List (Svg Msg)
+renderPlus style position value =
+    let
+        length =
+            style.cellWidth
+
+        middleColumn =
+            style.cellWidth * toFloat position.column + (style.cellWidth / 2)
+
+        middleRow =
+            style.cellHeight * toFloat position.row + (style.cellHeight / 2)
+
+        columnStart =
+            style.cellWidth * toFloat position.column
+
+        rowStart =
+            style.cellHeight * toFloat position.row
+    in
+    [ Svg.polyline
+        [ Svg.Attributes.points
+            ([ ( middleColumn, rowStart )
+             , ( middleColumn, rowStart + length )
+             ]
+                |> List.map (\( x, y ) -> String.fromFloat x ++ "," ++ String.fromFloat y)
+                |> String.join " "
+            )
+        , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+        , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        ]
+        []
+    , Svg.polyline
+        [ Svg.Attributes.points
+            ([ ( columnStart, middleRow )
+             , ( columnStart + length, middleRow )
+             ]
+                |> List.map (\( x, y ) -> String.fromFloat x ++ "," ++ String.fromFloat y)
+                |> String.join " "
+            )
+        , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+        , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        ]
+        []
+    ]
+
+
+renderMinus : CellStyle a -> Position -> a -> List (Svg Msg)
+renderMinus style position value =
+    let
+        length =
+            style.cellWidth
+
+        middleRow =
+            style.cellHeight * toFloat position.row + (style.cellHeight / 2)
+
+        columnStart =
+            style.cellWidth * toFloat position.column
+    in
+    [ Svg.polyline
+        [ Svg.Attributes.points
+            ([ ( columnStart, middleRow )
+             , ( columnStart + length, middleRow )
+             ]
+                |> List.map (\( x, y ) -> String.fromFloat x ++ "," ++ String.fromFloat y)
+                |> String.join " "
+            )
+        , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+        , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        ]
+        []
+    ]
+
+
 renderPiece : CellStyle a -> Position -> a -> List (Svg Msg)
 renderPiece style position value =
     if style.shouldRenderPiece value then
-        [ Svg.circle
+        Svg.circle
             [ Svg.Attributes.cx (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
             , Svg.Attributes.cy (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
             , Svg.Attributes.r (String.fromFloat (style.cellWidth * style.toPieceScale value))
@@ -133,22 +205,12 @@ renderPiece style position value =
             , Mouse.onOver (onMouseHover position)
             ]
             []
-        , Svg.text_
-            [ Svg.Attributes.x (String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
-            , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
-            , Svg.Attributes.textAnchor "middle"
-            , Svg.Attributes.alignmentBaseline "middle"
-            , Svg.Attributes.fontSize (String.fromFloat (style.cellWidth * 2.5 * style.toPieceScale value))
-            , Svg.Attributes.fontWeight "bold"
-            , Svg.Attributes.fontFamily "Consolas, monospace"
-            , Svg.Attributes.strokeWidth (String.fromFloat (style.gridLineWidth * 2.0))
-            , Svg.Attributes.fill (toCssString (style.toPieceTextColor value))
-            , Svg.Attributes.z "1000"
-            , Mouse.onDown (onMouseDown position)
-            , Mouse.onOver (onMouseHover position)
-            ]
-            [ Svg.text (style.toText value) ]
-        ]
+            :: (if style.toText value == "+" then
+                    renderPlus style position value
+
+                else
+                    renderMinus style position value
+               )
 
     else
         []
@@ -164,7 +226,7 @@ renderCell style position value =
         , Svg.Attributes.strokeWidth (String.fromFloat style.gridLineWidth)
         , Svg.Attributes.fill (toCssString (style.toCellColor value))
         , Svg.Attributes.stroke (toCssString style.gridLineColor)
-        , Svg.Attributes.fillOpacity "1" --(style.toCellOpacity value |> String.fromFloat)
+        , Svg.Attributes.fillOpacity "1"
         , Mouse.onDown (onMouseDown position)
         , Mouse.onOver (onMouseHover position)
         ]
