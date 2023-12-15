@@ -47,6 +47,7 @@ type alias Game =
     , friction : Float
     , padding : Int
     , aiMoves : Int
+    , aiProgress : Int
     }
 
 
@@ -119,6 +120,7 @@ init settings =
             , friction = settings.friction
             , padding = settings.padding
             , aiMoves = Basics.max 150 settings.gridSize * 2
+            , aiProgress = 0
             }
     in
     initialGame |> (\game -> withDetermineUpdateCommand game [] game)
@@ -563,7 +565,7 @@ progressGameSuccess player game =
 -}
 simulateGameBoard : Int -> Game -> Game -> Game
 simulateGameBoard steps prevGame currentGame =
-    if steps <= 0 || prevGame == currentGame then
+    if steps <= 0 || prevGame.board.coordinatePieces == currentGame.board.coordinatePieces then
         currentGame
 
     else
@@ -580,7 +582,7 @@ getMoveScore player move game =
                 { game | board = insertPiece { player = player, polarity = move.polarity } (intCoordinateToFloat { x = move.x, y = move.y }) game.board }
 
             simulatedGame =
-                simulateGameBoard 20 game newGame
+                simulateGameBoard 10 game newGame
         in
         Just (getAvgScoreMargin player simulatedGame)
 
