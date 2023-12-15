@@ -1040,6 +1040,22 @@ getCellOpacityFromContent opacity content =
             1
 
 
+getPieceClassFromContent : CellContent -> String
+getPieceClassFromContent content =
+    case content of
+        GridPiece piece ->
+            "live-piece"
+
+        PieceOnField piece _ ->
+            "live-piece"
+
+        DarkZone (Just piece) _ ->
+            "dead-piece"
+
+        _ ->
+            ""
+
+
 getMagneticFieldColorWinner : Int -> Int -> MagneticField -> Color.Color
 getMagneticFieldColorWinner totalPieces magnetism field =
     Dict.foldl
@@ -1098,7 +1114,7 @@ getPieceScaleFromContent content =
             1.0
 
         DarkZone (Just piece) _ ->
-            0.65
+            0.5
 
         _ ->
             1.0
@@ -1187,6 +1203,7 @@ cellStyle padding magnetism board =
     , toPieceColor = \z -> getPieceColorFromContent z
     , toPieceScale = \z -> getPieceScaleFromContent z
     , toCellOpacity = \z -> getCellOpacityFromContent 0.7 z
+    , toPieceClass = \z -> getPieceClassFromContent z
     , toText = \content -> getTextFromContent content
     , cellWidth = toFloat (board.config.displaySize // (board.config.gridDimensions + 2 * padding))
     , toPieceTextColor = \content -> getTextColorFromContent content

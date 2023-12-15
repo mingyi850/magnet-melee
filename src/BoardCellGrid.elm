@@ -43,6 +43,7 @@ type alias CellStyle a =
     , toPieceColor : a -> Color
     , toPieceTextColor : a -> Color
     , toPieceScale : a -> Float
+    , toPieceClass : a -> String
     , toCellOpacity : a -> Float
     , toText : a -> String
     , gridLineWidth : Float
@@ -91,7 +92,7 @@ asSvg style cellGrid =
                 |> CellGrid.foldr (::) []
 
         pieces =
-            CellGrid.indexedMap (\i j -> renderPiece style (Position i j)) cellGrid
+            CellGrid.indexedMap (\i j -> renderPiece2 style (Position i j)) cellGrid
                 |> CellGrid.foldr (++) []
     in
     Svg.g [] (boxes ++ pieces)
@@ -198,6 +199,114 @@ renderMinus style position value =
     ]
 
 
+renderPlus2 : CellStyle a -> Position -> a -> List (Svg Msg)
+renderPlus2 style position value =
+    let
+        length =
+            style.cellWidth * style.toPieceScale value
+
+        borders =
+            (style.cellWidth - length) / 2
+    in
+    [ Svg.polyline
+        [ Svg.Attributes.points
+            ([ ( style.cellWidth * 1.5, style.cellWidth + borders )
+             , ( style.cellWidth * 1.5, style.cellWidth + borders + length )
+             ]
+                |> List.map (\( x, y ) -> String.fromFloat x ++ "," ++ String.fromFloat y)
+                |> String.join " "
+            )
+        , Svg.Attributes.class (style.toPieceClass value)
+        , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+        , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        , Svg.Attributes.z "600"
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver (onMouseHover position)
+        ]
+        []
+    , Svg.polyline
+        [ Svg.Attributes.points
+            ([ ( style.cellHeight + borders, style.cellHeight * 1.5 )
+             , ( style.cellHeight + borders + length, style.cellHeight * 1.5 )
+             ]
+                |> List.map (\( x, y ) -> String.fromFloat x ++ "," ++ String.fromFloat y)
+                |> String.join " "
+            )
+        , Svg.Attributes.class (style.toPieceClass value)
+        , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+        , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2))
+        , Svg.Attributes.z "600"
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver (onMouseHover position)
+        ]
+        []
+    ]
+
+
+renderMinus2 : CellStyle a -> Position -> a -> List (Svg Msg)
+renderMinus2 style position value =
+    let
+        length =
+            style.cellWidth * style.toPieceScale value
+
+        borders =
+            (style.cellWidth - length) / 2
+    in
+    [ Svg.polyline
+        [ Svg.Attributes.points
+            ([ ( style.cellHeight + borders, style.cellHeight * 1.5 )
+             , ( style.cellHeight + borders + length, style.cellHeight * 1.5 )
+             ]
+                |> List.map (\( x, y ) -> String.fromFloat x ++ "," ++ String.fromFloat y)
+                |> String.join " "
+            )
+        , Svg.Attributes.class (style.toPieceClass value)
+        , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+        , Svg.Attributes.strokeWidth (String.fromFloat (style.pieceLineWidth * 2.5))
+        , Svg.Attributes.z "600"
+        , Mouse.onDown (onMouseDown position)
+        , Mouse.onOver (onMouseHover position)
+        ]
+        []
+    ]
+
+
+renderPiece2 : CellStyle a -> Position -> a -> List (Svg Msg)
+renderPiece2 style position value =
+    if style.shouldRenderPiece value then
+        [ Svg.svg
+            [ Svg.Attributes.width (String.fromFloat (style.cellWidth * 3))
+            , Svg.Attributes.height (String.fromFloat (style.cellHeight * 3))
+            , Svg.Attributes.x (String.fromFloat (style.cellWidth * (toFloat position.column - 1)))
+            , Svg.Attributes.y (String.fromFloat (style.cellHeight * (toFloat position.row - 1)))
+            ]
+            (Svg.circle
+                [ Svg.Attributes.class (style.toPieceClass value)
+                , Svg.Attributes.cx "50%" --(String.fromFloat (style.cellWidth * toFloat position.column + (style.cellWidth / 2)))
+                , Svg.Attributes.cy "50%" --(String.fromFloat (style.cellHeight * toFloat position.row + (style.cellHeight / 2)))
+                , Svg.Attributes.r (String.fromFloat (style.toPieceScale value * 33) ++ "%")
+                , Svg.Attributes.strokeWidth (String.fromFloat style.pieceLineWidth)
+                , Svg.Attributes.fill (toCssString (style.toPieceColor value))
+                , Svg.Attributes.stroke (toCssString (style.toPieceTextColor value))
+                , Svg.Attributes.fillOpacity "1"
+                , Svg.Attributes.z "500"
+                , Mouse.onDown (onMouseDown position)
+                , Mouse.onOver (onMouseHover position)
+                ]
+                []
+                :: (if style.toText value == "+" then
+                        renderPlus2 style position value
+
+                    else
+                        renderMinus2 style position value
+                   )
+            )
+        ]
+
+    else
+        []
+
+
 renderPiece : CellStyle a -> Position -> a -> List (Svg Msg)
 renderPiece style position value =
     if style.shouldRenderPiece value then
@@ -229,7 +338,8 @@ renderPiece style position value =
 renderCell : CellStyle a -> Position -> a -> Svg Msg
 renderCell style position value =
     Svg.rect
-        [ Svg.Attributes.width (String.fromFloat style.cellWidth)
+        [ Svg.Attributes.class "cell"
+        , Svg.Attributes.width (String.fromFloat style.cellWidth)
         , Svg.Attributes.height (String.fromFloat style.cellHeight)
         , Svg.Attributes.x (String.fromFloat (style.cellWidth * toFloat position.column))
         , Svg.Attributes.y (String.fromFloat (style.cellHeight * toFloat position.row))
